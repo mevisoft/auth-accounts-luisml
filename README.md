@@ -7,11 +7,7 @@ Requisitos: PHP ^8.2 y Laravel ^11, ^12 o ^13.
 
 ## Instalación
 
-1. Instala el paquete (hoy como repositorio `path`; en `composer.json` de la app):
-
-   ```json
-   "repositories": [{ "type": "path", "url": "../accounts-client" }]
-   ```
+1. Instala el paquete (publicado en Packagist; hoy solo existe `dev-main`, de ahí el `@dev`):
 
    ```bash
    composer require mevisoft/auth-accounts-luisml:@dev
