@@ -4,6 +4,7 @@ namespace LuisML\AccountsClient\Actions;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use LuisML\AccountsClient\Identity;
 
@@ -27,6 +28,11 @@ class ResolveModelUser
             'name' => $identity->name ?? $user->name ?? 'Cuenta LuisML',
             'email' => $identity->email,
         ], fn ($value) => $value !== null));
+
+        // Accounts is the authority on email verification: a verified email there is verified here.
+        if ($identity->emailVerified && $identity->email !== null && Schema::hasColumn($user->getTable(), 'email_verified_at') && $user->email_verified_at === null) {
+            $user->forceFill(['email_verified_at' => now()]);
+        }
 
         if (! $user->exists) {
             $user->forceFill([

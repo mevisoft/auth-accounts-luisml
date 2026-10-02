@@ -213,3 +213,9 @@ test('a discovery document that declares another issuer is rejected', function (
 
     $this->get('/auth/accounts/redirect')->assertStatus(503);
 });
+
+test('an email Accounts verified arrives verified, because Accounts is the authority on that', function () {
+    $this->login();
+
+    expect(User::firstOrFail()->email_verified_at)->not->toBeNull();
+});
