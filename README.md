@@ -120,6 +120,20 @@ confirmación (`--force` la omite). Un archivo que otro código todavía usa (p.
 `FortifyServiceProvider`, las rutas de seguridad, enlaces de registro, el menú de usuario) se imprime como pasos
 manuales porque depende de cada app.
 
+## Opciones de `accounts:install`
+
+| Opción | Qué hace |
+|---|---|
+| *(sin opciones)* | Añade las variables que falten, informa de los restos de login local, de los grupos de rutas con `auth` sin `accounts.access`, de imports del frontend a rutas que ya no existen y de variables vacías. No borra ni reescribe nada salvo `.env`/`.env.example` (añadir variables) y un `import '@inertiajs/core'` en `global.d.ts` si el borrado lo dejó huérfano. |
+| `--migrate` | Ejecuta las migraciones. |
+| `--protect-routes` | Añade `accounts.access` y `accounts.activity` a cada `middleware([... 'auth' ...])` de `routes/*.php` que no los tenga. Es idempotente. |
+| `--remove-auth` | Borra los restos de login local y vacía `features` de Fortify (con confirmación; `--force` la omite). |
+| `--test-helper` | Añade a `tests/TestCase.php` un `actingAs()` que abre una sesión de Accounts validada. |
+| `--check` | Pide `/.well-known/openid-configuration` al *issuer*, comprueba que su `issuer` coincide con `ACCOUNTS_ISSUER`, que el callback es una URL absoluta y que la tabla de usuarios tiene las columnas. |
+
+Orden recomendado: `accounts:install --migrate --protect-routes --test-helper --remove-auth`, completar a mano lo que imprime
+(login, `FortifyServiceProvider`, menú), rellenar `.env` con los datos de la app registrada y terminar con `accounts:install --check`.
+
 ## Pruebas en la app
 
 Con el modo estricto, todo `actingAs` necesita una sesión de Accounts validada. Una forma de hacerlo en `tests/TestCase.php`:

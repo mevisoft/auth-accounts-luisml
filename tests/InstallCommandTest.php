@@ -70,3 +70,72 @@ test('--remove-auth keeps a file that other code still uses', function () {
 
     expect(File::exists($this->dir.'/app/Http/Controllers/Settings/SecurityController.php'))->toBeTrue();
 });
+
+test('it reports route groups without accounts.access and --protect-routes fixes them once', function () {
+    writeProjectFile($this->dir, 'routes/web.php', "Route::middleware(['auth', 'verified'])->group(fn () => 1);\nRoute::middleware(['auth', 'accounts.access'])->group(fn () => 2);\nRoute::get('/')->middleware(['throttle:6,1']);");
+
+    $this->artisan('accounts:install')->expectsOutputToContain('routes/web.php: 1 group(s)')->assertSuccessful();
+
+    $this->artisan('accounts:install', ['--protect-routes' => true])->assertSuccessful();
+    $this->artisan('accounts:install', ['--protect-routes' => true])->assertSuccessful();
+
+    $routes = File::get($this->dir.'/routes/web.php');
+
+    expect($routes)->toContain("middleware(['auth', 'accounts.access', 'accounts.activity', 'verified'])")
+        ->and(substr_count($routes, 'accounts.access'))->toBe(2)
+        ->and($routes)->toContain("middleware(['auth', 'accounts.access'])")
+        ->and($routes)->toContain("middleware(['throttle:6,1'])");
+});
+
+test('--test-helper adds an actingAs override with an Accounts session, once', function () {
+    writeProjectFile($this->dir, 'tests/TestCase.php', "<?php\n\nnamespace Tests;\n\nabstract class TestCase extends \\Illuminate\\Foundation\\Testing\\TestCase\n{\n    //\n}\n");
+
+    $this->artisan('accounts:install', ['--test-helper' => true])->assertSuccessful();
+    $this->artisan('accounts:install', ['--test-helper' => true])->assertSuccessful();
+
+    $contents = File::get($this->dir.'/tests/TestCase.php');
+
+    expect(substr_count($contents, 'function actingAs'))->toBe(1)
+        ->and($contents)->toContain("'accounts.session'");
+    expect(shell_exec('php -l '.escapeshellarg($this->dir.'/tests/TestCase.php').' 2>&1'))->toContain('No syntax errors');
+});
+
+test('--check reports an issuer that differs from the discovery document', function () {
+    \Illuminate\Support\Facades\Http::swap(new \Illuminate\Http\Client\Factory);
+    \Illuminate\Support\Facades\Http::fake(['*/.well-known/openid-configuration' => \Illuminate\Support\Facades\Http::response(['issuer' => 'https://other.example.test'])]);
+
+    \Illuminate\Support\Facades\Artisan::call('accounts:install', ['--check' => true]);
+
+    expect(\Illuminate\Support\Facades\Artisan::output())->toContain('Issuer mismatch');
+});
+
+test('--check passes when the discovery issuer matches', function () {
+    \Illuminate\Support\Facades\Http::swap(new \Illuminate\Http\Client\Factory);
+    \Illuminate\Support\Facades\Http::fake(['*/.well-known/openid-configuration' => \Illuminate\Support\Facades\Http::response(['issuer' => 'https://accounts.example.test'])]);
+
+    $this->artisan('accounts:install', ['--check' => true])
+        ->expectsOutputToContain('its issuer matches')
+        ->assertSuccessful();
+});
+
+test('it restores the Inertia type import that deleting files can orphan', function () {
+    writeProjectFile($this->dir, 'resources/js/types/global.d.ts', "import type { Auth } from '@/types/auth';\n\ndeclare module '@inertiajs/core' {}\n");
+    writeProjectFile($this->dir, 'node_modules/@inertiajs/core/package.json', '{}');
+
+    $this->artisan('accounts:install')->assertSuccessful();
+    $this->artisan('accounts:install')->assertSuccessful();
+
+    $types = File::get($this->dir.'/resources/js/types/global.d.ts');
+
+    expect(substr_count($types, "import '@inertiajs/core'"))->toBe(1)
+        ->and($types)->toStartWith("import '@inertiajs/core';");
+});
+
+test('it reports frontend files that import removed routes', function () {
+    writeProjectFile($this->dir, 'resources/js/pages/settings/profile.tsx', "import { send } from '@/routes/verification';");
+    writeProjectFile($this->dir, 'resources/js/routes/verification/index.ts', "import '@/routes/verification';");
+
+    $this->artisan('accounts:install')
+        ->expectsOutputToContain('resources/js/pages/settings/profile.tsx (@/routes/verification)')
+        ->assertSuccessful();
+});
