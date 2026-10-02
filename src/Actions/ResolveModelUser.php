@@ -17,18 +17,23 @@ class ResolveModelUser
     {
         $model = (string) config('accounts.user_model');
 
-        $user = $model::query()->firstOrNew([
-            'accounts_issuer' => $identity->issuer,
-            'accounts_sub' => $identity->subject,
-        ]);
+        $user = $model::query()
+            ->where('accounts_issuer', $identity->issuer)
+            ->where('accounts_sub', $identity->subject)
+            ->first() ?? new $model;
 
+        // forceFill: the application's own mass-assignment rules must not drop the link columns.
         $user->forceFill(array_filter([
             'name' => $identity->name ?? $user->name ?? 'Cuenta LuisML',
             'email' => $identity->email,
         ], fn ($value) => $value !== null));
 
         if (! $user->exists) {
-            $user->forceFill(['password' => Hash::make(Str::random(64))]);
+            $user->forceFill([
+                'accounts_issuer' => $identity->issuer,
+                'accounts_sub' => $identity->subject,
+                'password' => Hash::make(Str::random(64)),
+            ]);
         }
 
         $user->save();
