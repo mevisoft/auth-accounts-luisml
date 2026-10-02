@@ -3,7 +3,7 @@
 Cliente Laravel de **Accounts LuisML**: «Continuar con LuisML» (OpenID Connect con PKCE) y control central de sesión.
 La app deja de gestionar contraseñas; Accounts decide quién entra y cuánto dura la sesión.
 
-Requisitos: PHP ^8.2 y Laravel ^12 o ^13.
+Requisitos: PHP ^8.2 y Laravel ^11, ^12 o ^13.
 
 ## Instalación
 
