@@ -1,5 +1,5 @@
 {
-    "name": "luisml/accounts-client",
+    "name": "mevisoft/auth-accounts-luisml",
     "description": "Laravel client for Accounts LuisML: Continuar con LuisML (OpenID Connect) with central session control.",
     "type": "library",
     "license": "proprietary",
