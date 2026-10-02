@@ -4,6 +4,7 @@ namespace LuisML\AccountsClient;
 
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
+use LuisML\AccountsClient\Console\InstallCommand;
 use LuisML\AccountsClient\Http\Middleware\EnsureAccountsAccess;
 use LuisML\AccountsClient\Http\Middleware\ReportAccountsActivity;
 
@@ -22,6 +23,10 @@ class AccountsServiceProvider extends ServiceProvider
 
         $router->aliasMiddleware('accounts.access', EnsureAccountsAccess::class);
         $router->aliasMiddleware('accounts.activity', ReportAccountsActivity::class);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([InstallCommand::class]);
+        }
 
         $this->publishes([__DIR__.'/../config/accounts.php' => config_path('accounts.php')], 'accounts-config');
     }
