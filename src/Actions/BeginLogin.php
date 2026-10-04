@@ -14,9 +14,14 @@ class BeginLogin
     /**
      * Start a login: one transaction per state (so several tabs never mix), each with its own nonce
      * and PKCE verifier, valid for a few minutes and consumable once. Returns Accounts' authorize URL.
+     *
+     * `$options` may ask for a stronger or fresher authentication: `acr_values`, `max_age`, `prompt`.
+     *
+     * @param  array<string, mixed>  $options
      */
-    public function handle(Request $request, ?string $intended = null): string
+    public function handle(Request $request, ?string $intended = null, array $options = []): string
     {
+        $options = $this->allowed($options);
         $metadata = $this->discovery->metadata();
 
         $state = Str::random(40);
@@ -32,6 +37,8 @@ class BeginLogin
             'nonce' => $nonce,
             'verifier' => $verifier,
             'intended' => $intended,
+            'max_age' => $options['max_age'] ?? null,
+            'acr_values' => $options['acr_values'] ?? null,
             'expires_at' => now()->getTimestamp() + (int) config('accounts.transaction_minutes') * 60,
         ];
 
@@ -46,13 +53,39 @@ class BeginLogin
             'nonce' => $nonce,
             'code_challenge' => rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '='),
             'code_challenge_method' => 'S256',
+            ...$options,
         ]);
+    }
+
+    /**
+     * Only the authentication parameters this client understands ever reach Accounts.
+     *
+     * @param  array<string, mixed>  $options
+     * @return array<string, int|string>
+     */
+    private function allowed(array $options): array
+    {
+        $allowed = [];
+
+        if (isset($options['max_age']) && is_numeric($options['max_age']) && (int) $options['max_age'] >= 0) {
+            $allowed['max_age'] = (int) $options['max_age'];
+        }
+
+        if (isset($options['acr_values']) && is_string($options['acr_values']) && preg_match('/^[A-Za-z0-9:._\- ]{1,512}$/', $options['acr_values'])) {
+            $allowed['acr_values'] = $options['acr_values'];
+        }
+
+        if (isset($options['prompt']) && in_array($options['prompt'], ['login', 'consent'], true)) {
+            $allowed['prompt'] = $options['prompt'];
+        }
+
+        return $allowed;
     }
 
     /**
      * Consume the transaction for a state. A state is good once; unknown or expired ones return null.
      *
-     * @return array{nonce: string, verifier: string, intended: ?string, expires_at: int}|null
+     * @return array{nonce: string, verifier: string, intended: ?string, max_age: ?int, acr_values: ?string, expires_at: int}|null
      */
     public function consume(Request $request, string $state): ?array
     {

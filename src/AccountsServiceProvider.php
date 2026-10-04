@@ -7,6 +7,7 @@ use Illuminate\Support\ServiceProvider;
 use LuisML\AccountsClient\Console\InstallCommand;
 use LuisML\AccountsClient\Http\Middleware\EnsureAccountsAccess;
 use LuisML\AccountsClient\Http\Middleware\ReportAccountsActivity;
+use LuisML\AccountsClient\Http\Middleware\RequireAccountsAssurance;
 
 class AccountsServiceProvider extends ServiceProvider
 {
@@ -23,6 +24,7 @@ class AccountsServiceProvider extends ServiceProvider
 
         $router->aliasMiddleware('accounts.access', EnsureAccountsAccess::class);
         $router->aliasMiddleware('accounts.activity', ReportAccountsActivity::class);
+        $router->aliasMiddleware('accounts.step-up', RequireAccountsAssurance::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([InstallCommand::class]);

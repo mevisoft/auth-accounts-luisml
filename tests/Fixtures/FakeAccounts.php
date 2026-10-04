@@ -36,6 +36,9 @@ class FakeAccounts
 
     public string $subject = 'subject-1';
 
+    /** @var array<string, mixed> claims added to the ID Token Accounts answers the code with */
+    public array $idTokenClaims = [];
+
     /** @var list<string> */
     public array $calls = [];
 
@@ -74,6 +77,7 @@ class FakeAccounts
                     'token_endpoint' => $issuer.'/oauth/token',
                     'userinfo_endpoint' => $issuer.'/oauth/userinfo',
                     'jwks_uri' => $issuer.'/oauth/jwks',
+                    'end_session_endpoint' => $issuer.'/oauth/end-session',
                 ]),
                 $path === '/oauth/jwks' => Http::response(['keys' => [$this->jwk()]]),
                 $path === '/oauth/token' => $this->token($request),
@@ -113,6 +117,7 @@ class FakeAccounts
 
         $header = ['typ' => 'JWT', 'alg' => $alg ?? 'RS256', 'kid' => $overrides['kid'] ?? $this->kid];
         unset($claims['kid']);
+        $claims = array_filter($claims, fn ($value): bool => $value !== null);
 
         $encode = fn (array $data): string => rtrim(strtr(base64_encode(json_encode($data)), '+/', '-_'), '=');
         $signingInput = $encode($header).'.'.$encode($claims);
@@ -124,6 +129,22 @@ class FakeAccounts
         }
 
         return $signingInput.'.'.rtrim(strtr(base64_encode($signature), '+/', '-_'), '=');
+    }
+
+    /**
+     * A Back-Channel Logout token for a session id.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    public function logoutToken(string $sid, array $overrides = []): string
+    {
+        return $this->idToken('', [
+            'jti' => 'jti-'.bin2hex(random_bytes(4)),
+            'sid' => $sid,
+            'events' => ['http://schemas.openid.net/event/backchannel-logout' => new \stdClass],
+            'nonce' => null,
+            ...$overrides,
+        ]);
     }
 
     /**
@@ -169,7 +190,7 @@ class FakeAccounts
             'expires_in' => 300,
             'access_token' => 'access-initial',
             'refresh_token' => 'refresh-initial',
-            'id_token' => $this->idToken($this->lastNonce['nonce'] ?? ''),
+            'id_token' => $this->idToken($this->lastNonce['nonce'] ?? '', $this->idTokenClaims),
         ]);
     }
 

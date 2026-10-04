@@ -5,10 +5,12 @@ namespace LuisML\AccountsClient\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use LuisML\AccountsClient\AccountsSession;
 use LuisML\AccountsClient\AccountsUnavailable;
 use LuisML\AccountsClient\Actions\AccountsHttp;
 use LuisML\AccountsClient\Actions\RefreshAccountsSession;
+use LuisML\AccountsClient\Http\Controllers\AccountsBackchannelLogoutController;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureAccountsAccess
@@ -38,6 +40,10 @@ class EnsureAccountsAccess
             return $this->toLogin($request);
         }
 
+        if ($this->endedByAccounts($state)) {
+            return $this->reauthorize($request);
+        }
+
         if ($state->validatedUntil() > now()->getTimestamp()) {
             return $next($request);
         }
@@ -65,6 +71,16 @@ class EnsureAccountsAccess
         $state->validated($startedAt, $response->json('accounts_session_expires_at'));
 
         return $next($request);
+    }
+
+    /**
+     * Accounts announced (back-channel logout) that this browser's central session ended.
+     */
+    private function endedByAccounts(AccountsSession $state): bool
+    {
+        $sid = $state->sessionId();
+
+        return $sid !== null && Cache::has(AccountsBackchannelLogoutController::cacheKey($sid));
     }
 
     private function toLogin(Request $request): Response

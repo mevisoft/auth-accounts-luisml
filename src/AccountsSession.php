@@ -22,11 +22,17 @@ final class AccountsSession
 
     /**
      * @param  array{access_token: string, refresh_token: ?string, expires_in: int}  $tokens
+     * @param  array<string, mixed>  $authentication  what the ID Token says about how the person signed in
      */
-    public function store(array $tokens, int $validatedUntil, ?int $sessionExpiresAt, string $subject): void
+    public function store(array $tokens, int $validatedUntil, ?int $sessionExpiresAt, string $subject, array $authentication = [], ?string $idToken = null): void
     {
         $this->session->put(self::KEY, [
             'subject' => $subject,
+            'id_token' => $idToken === null ? null : Crypt::encryptString($idToken),
+            'auth_time' => isset($authentication['auth_time']) ? (int) $authentication['auth_time'] : null,
+            'acr' => is_string($authentication['acr'] ?? null) ? $authentication['acr'] : null,
+            'amr' => is_array($authentication['amr'] ?? null) ? array_values($authentication['amr']) : [],
+            'sid' => is_string($authentication['sid'] ?? null) ? $authentication['sid'] : null,
             'access_token' => Crypt::encryptString($tokens['access_token']),
             'refresh_token' => $tokens['refresh_token'] === null ? null : Crypt::encryptString($tokens['refresh_token']),
             'access_expires_at' => now()->getTimestamp() + $tokens['expires_in'],
@@ -54,6 +60,49 @@ final class AccountsSession
     public function refreshToken(): ?string
     {
         return $this->decrypt('refresh_token');
+    }
+
+    public function idToken(): ?string
+    {
+        return $this->decrypt('id_token');
+    }
+
+    /**
+     * When the person last authenticated at Accounts, as the ID Token reported it.
+     */
+    public function authTime(): ?int
+    {
+        $value = $this->value('auth_time');
+
+        return $value === null ? null : (int) $value;
+    }
+
+    /**
+     * The assurance level the sign-in reached (`acr`), if Accounts reported one.
+     */
+    public function acr(): ?string
+    {
+        $value = $this->value('acr');
+
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function amr(): array
+    {
+        return (array) $this->value('amr', []);
+    }
+
+    /**
+     * The id of this browser's session at Accounts, as named by back-channel logout.
+     */
+    public function sessionId(): ?string
+    {
+        $value = $this->value('sid');
+
+        return is_string($value) ? $value : null;
     }
 
     public function accessExpired(): bool

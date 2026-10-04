@@ -21,7 +21,7 @@ class CompleteLogin
      * Redeem the code, validate the ID Token, confirm the subject with UserInfo, link the local
      * user by (issuer, sub), regenerate the session and keep the tokens server-side.
      *
-     * @param  array{nonce: string, verifier: string}  $transaction
+     * @param  array{nonce: string, verifier: string, max_age?: ?int}  $transaction
      */
     public function handle(Request $request, string $code, array $transaction): Authenticatable
     {
@@ -42,6 +42,8 @@ class CompleteLogin
         }
 
         $claims = $this->validate->handle($tokens->json('id_token'), $transaction['nonce']);
+
+        $this->assertFreshEnough($claims, $transaction['max_age'] ?? null);
 
         $info = $this->http->client()->withToken($tokens->json('access_token'))->get($metadata['userinfo_endpoint']);
 
@@ -70,9 +72,27 @@ class CompleteLogin
         ];
 
         $session = AccountsSession::for($request->session());
-        $session->store($payload, 0, null, $identity->subject);
+        $session->store($payload, 0, null, $identity->subject, $claims, $tokens->json('id_token'));
         $session->validated($startedAt, null);
 
         return $user;
+    }
+
+    /**
+     * When `max_age` was asked for, the ID Token must say when the person authenticated, and recently.
+     *
+     * @param  array<string, mixed>  $claims
+     */
+    private function assertFreshEnough(array $claims, ?int $maxAge): void
+    {
+        if ($maxAge === null) {
+            return;
+        }
+
+        $authTime = $claims['auth_time'] ?? null;
+
+        if (! is_numeric($authTime) || now()->getTimestamp() - (int) $authTime > $maxAge + (int) config('accounts.clock_skew_seconds')) {
+            throw new RuntimeException('Accounts no confirmó una autenticación reciente.');
+        }
     }
 }

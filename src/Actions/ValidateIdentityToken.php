@@ -30,6 +30,39 @@ class ValidateIdentityToken
      */
     public function handle(string $jwt, string $nonce): array
     {
+        $token = $this->verified($jwt);
+
+        if (! hash_equals($nonce, (string) $token->claims()->get('nonce', ''))) {
+            throw new RuntimeException('ID Token inválido.');
+        }
+
+        return $token->claims()->all();
+    }
+
+    /**
+     * Validate a Back-Channel Logout token: same signature, issuer and audience rules, but it must
+     * announce the logout event, carry a `jti` and the session id, and never a `nonce`.
+     *
+     * @return array<string, mixed>
+     */
+    public function handleLogoutToken(string $jwt): array
+    {
+        $claims = $this->verified($jwt)->claims();
+
+        $events = $claims->get('events');
+
+        if (! is_array($events) || ! array_key_exists('http://schemas.openid.net/event/backchannel-logout', $events)
+            || $claims->has('nonce')
+            || ! is_string($claims->get('jti'))
+            || ! is_string($claims->get('sid'))) {
+            throw new RuntimeException('Token de cierre de sesión inválido.');
+        }
+
+        return $claims->all();
+    }
+
+    private function verified(string $jwt): Plain
+    {
         try {
             $token = (new Parser(new JoseEncoder))->parse($jwt);
         } catch (Throwable) {
@@ -58,10 +91,10 @@ class ValidateIdentityToken
             new LooseValidAt(new SystemClock, new DateInterval('PT'.(int) config('accounts.clock_skew_seconds').'S')),
         );
 
-        if (! $valid || ! hash_equals($nonce, (string) $token->claims()->get('nonce', '')) || ! is_string($token->claims()->get('sub'))) {
+        if (! $valid || ! is_string($token->claims()->get('sub'))) {
             throw new RuntimeException('ID Token inválido.');
         }
 
-        return $token->claims()->all();
+        return $token;
     }
 }

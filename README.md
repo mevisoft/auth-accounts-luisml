@@ -57,6 +57,7 @@ Requisitos: PHP ^8.2 y Laravel ^11, ^12 o ^13.
 | `accounts.login` | `GET /auth/accounts/redirect` | Inicia el login (PKCE, `state`, `nonce`). |
 | `accounts.callback` | `GET /auth/accounts/callback` | Retorno de Accounts. No enlazar. |
 | `accounts.logout` | `POST /auth/accounts/logout` | Cierre de sesión con revocación. |
+| `accounts.backchannel-logout` | `POST /auth/accounts/backchannel-logout` | Aviso de Accounts de que una sesión terminó. Sin cookies ni CSRF. No enlazar. |
 
 El prefijo se cambia con `accounts.routes.prefix`.
 
@@ -67,7 +68,18 @@ El prefijo se cambia con `accounts.routes.prefix`.
   - Si Accounts dice que ya no está activo (revocado, caducado, suspendido), la sesión local se cierra y se envía a iniciar sesión.
   - Si Accounts no responde, la operación se bloquea con un 503 recuperable (`Retry-After`). La sesión local se conserva y **nunca se repite una mutación automáticamente**.
   - `accounts.access:lenient` deja pasar a quien entró por otro método (sin sesión de Accounts), para apps que conservan su login propio. Por defecto es estricto.
+- **`accounts.step-up`**: pide una autenticación más fuerte o más reciente para una operación sensible: `accounts.step-up:acr=urn:accounts:acr:phr,max_age=300`.
+  - Los niveles son `urn:accounts:acr:pwd` < `urn:accounts:acr:mfa` < `urn:accounts:acr:phr` (passkey).
+  - Si la sesión no cumple, envía a Accounts (`acr_values` / `max_age`) y vuelve a la misma petición. A clientes JSON les responde 401 con `code: accounts_step_up_required`.
+  - Si Accounts no puede elevar el nivel (la cuenta no tiene passkey), un segundo intento para la misma dirección se rechaza con 403 en vez de repetirse sin fin.
+  - Para pedirlo en un login concreto: `route('accounts.login', ['acr_values' => 'urn:accounts:acr:phr', 'max_age' => 300])`. Solo `acr_values`, `max_age` y `prompt` (`login` o `consent`) llegan a Accounts.
 - **`accounts.activity`**: informa a Accounts de actividad real, como mucho cada 15 s. Ignora el polling, el prefetch y las respuestas con error.
+
+## Cierre de sesión central
+
+- **Local (por defecto):** `POST accounts.logout` cierra la sesión de esta app y revoca su acceso.
+- **Global:** con `ACCOUNTS_GLOBAL_LOGOUT=true` el cierre también termina la sesión central en Accounts (RP-initiated logout, con `id_token_hint`) y vuelve a `ACCOUNTS_POST_LOGOUT_REDIRECT_URI`, que debe estar registrada para esta app en Accounts. Solo se aplica a sesiones iniciadas con esta versión (necesitan el ID Token guardado).
+- **Back-channel:** registra en Accounts la dirección `https://tu-app/auth/accounts/backchannel-logout`. Cuando la sesión central termina (cierre en otra app, cierre de todas las sesiones, cambio de contraseña, suspensión), Accounts avisa y la sesión local se cierra en su siguiente petición. Requiere una caché compartida por todos los servidores de la app (no `array`).
 
 ## Usuarios
 
@@ -159,6 +171,8 @@ public function actingAs(Authenticatable $user, $guard = null): static
 | `home` | `/` | `ACCOUNTS_HOME`. |
 | `scopes` | `openid profile email` | |
 | `http.connect_timeout` / `http.timeout` | 2 s / 3 s | `ACCOUNTS_CONNECT_TIMEOUT`, `ACCOUNTS_TIMEOUT`. |
+| `global_logout` | `false` | `ACCOUNTS_GLOBAL_LOGOUT`. Ver «Cierre de sesión central». |
+| `post_logout_redirect` | — | `ACCOUNTS_POST_LOGOUT_REDIRECT_URI`. |
 | `validation_seconds` | 60 | Plazo máximo de una validación. No ampliar sin medirlo. |
 | `activity_interval_seconds` | 15 | |
 | `clock_skew_seconds` | 30 | Tolerancia de reloj en los JWT; no extiende el plazo de 60 s. |

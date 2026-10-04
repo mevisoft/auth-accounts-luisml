@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Str;
+use LuisML\AccountsClient\Actions\Discovery;
 use LuisML\AccountsClient\AccountsSession;
 use LuisML\AccountsClient\Actions\AccountsHttp;
 use LuisML\AccountsClient\Jobs\RevokeAccountsAccess;
@@ -18,7 +20,7 @@ class AccountsLogoutController extends Controller
      * access. If that cannot be confirmed now, a durable job retries it and the person is told.
      * It never affects other apps, other browsers or the consent.
      */
-    public function __invoke(Request $request, AccountsHttp $http)
+    public function __invoke(Request $request, AccountsHttp $http, Discovery $discovery)
     {
         $state = AccountsSession::for($request->session());
         $token = $state->refreshToken() ?? $state->accessToken();
@@ -36,13 +38,48 @@ class AccountsLogoutController extends Controller
             }
         }
 
+        $endSession = $this->centralLogoutUrl($state->idToken(), $discovery);
+
         $state->forget();
         Auth::guard()->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
+        if ($endSession !== null) {
+            return redirect()->away($endSession);
+        }
+
         return redirect()->to(config('accounts.home'))->with('status', $confirmed
             ? 'Cerraste sesión.'
             : 'Cerraste sesión aquí. No pudimos confirmar el cierre en LuisML todavía; lo reintentaremos.');
+    }
+
+    /**
+     * With `global_logout`, where to send the browser to end the central session too. Null when it is
+     * off, when this session has no ID Token to prove who is asking, or when Accounts has no endpoint.
+     */
+    private function centralLogoutUrl(?string $idToken, Discovery $discovery): ?string
+    {
+        if (! config('accounts.global_logout') || $idToken === null) {
+            return null;
+        }
+
+        try {
+            $endpoint = $discovery->metadata()['end_session_endpoint'] ?? null;
+        } catch (Throwable) {
+            return null;
+        }
+
+        if (! is_string($endpoint)) {
+            return null;
+        }
+
+        $redirect = config('accounts.post_logout_redirect');
+
+        return $endpoint.'?'.http_build_query(array_filter([
+            'id_token_hint' => $idToken,
+            'post_logout_redirect_uri' => is_string($redirect) && $redirect !== '' ? $redirect : null,
+            'state' => Str::random(20),
+        ]));
     }
 }

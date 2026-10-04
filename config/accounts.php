@@ -35,6 +35,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Logout
+    |--------------------------------------------------------------------------
+    |
+    | With `global_logout`, signing out of this app also ends the person's central session in
+    | Accounts (RP-initiated logout) and returns to `post_logout_redirect`, an address registered
+    | for this app in Accounts. Off by default: signing out stays local to this app.
+    |
+    */
+
+    'global_logout' => (bool) env('ACCOUNTS_GLOBAL_LOGOUT', false),
+
+    'post_logout_redirect' => env('ACCOUNTS_POST_LOGOUT_REDIRECT_URI'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Limits
     |--------------------------------------------------------------------------
     */

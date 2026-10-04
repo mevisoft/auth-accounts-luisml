@@ -118,6 +118,15 @@ test('--check passes when the discovery issuer matches', function () {
         ->assertSuccessful();
 });
 
+test('--check warns when Accounts does not advertise logout or assurance levels', function () {
+    \Illuminate\Support\Facades\Http::swap(new \Illuminate\Http\Client\Factory);
+    \Illuminate\Support\Facades\Http::fake(['*/.well-known/openid-configuration' => \Illuminate\Support\Facades\Http::response(['issuer' => 'https://accounts.example.test'])]);
+
+    \Illuminate\Support\Facades\Artisan::call('accounts:install', ['--check' => true]);
+
+    expect(\Illuminate\Support\Facades\Artisan::output())->toContain('end_session_endpoint')->toContain('acr_values_supported');
+});
+
 test('it restores the Inertia type import that deleting files can orphan', function () {
     writeProjectFile($this->dir, 'resources/js/types/global.d.ts', "import type { Auth } from '@/types/auth';\n\ndeclare module '@inertiajs/core' {}\n");
     writeProjectFile($this->dir, 'node_modules/@inertiajs/core/package.json', '{}');

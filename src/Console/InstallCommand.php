@@ -262,6 +262,12 @@ PHP;
             $this->error('Issuer mismatch: discovery says '.$document->json('issuer').", ACCOUNTS_ISSUER is {$issuer}. Every ID Token would be rejected.");
         }
 
+        foreach (['end_session_endpoint' => 'RP-initiated logout (ACCOUNTS_GLOBAL_LOGOUT) will not work', 'acr_values_supported' => 'step-up (accounts.step-up) cannot raise the authentication level'] as $key => $consequence) {
+            if ($document->json($key) === null) {
+                $this->components->warn("Discovery does not advertise {$key}: {$consequence}. Update Accounts.");
+            }
+        }
+
         if (! str_starts_with((string) config('accounts.redirect'), 'http')) {
             $this->error('ACCOUNTS_REDIRECT_URI is not an absolute URL.');
         }

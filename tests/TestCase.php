@@ -10,7 +10,7 @@ use Orchestra\Testbench\TestCase as Orchestra;
 
 abstract class TestCase extends Orchestra
 {
-    protected FakeAccounts $accounts;
+    public FakeAccounts $accounts;
 
     protected function getPackageProviders($app): array
     {
@@ -63,7 +63,7 @@ abstract class TestCase extends Orchestra
      *
      * @return array{state: string, nonce: string, location: string, query: array<string, string>}
      */
-    protected function beginLogin(): array
+    public function beginLogin(): array
     {
         $response = $this->get('/auth/accounts/redirect')->assertRedirect();
         $location = $response->headers->get('Location');
@@ -77,7 +77,7 @@ abstract class TestCase extends Orchestra
     /**
      * Run the whole login and return the callback response.
      */
-    protected function login(): \Illuminate\Testing\TestResponse
+    public function login(): \Illuminate\Testing\TestResponse
     {
         $login = $this->beginLogin();
 
