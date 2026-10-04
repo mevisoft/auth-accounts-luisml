@@ -81,6 +81,12 @@ El prefijo se cambia con `accounts.routes.prefix`.
 - **Global:** con `ACCOUNTS_GLOBAL_LOGOUT=true` el cierre también termina la sesión central en Accounts (RP-initiated logout, con `id_token_hint`) y vuelve a `ACCOUNTS_POST_LOGOUT_REDIRECT_URI`, que debe estar registrada para esta app en Accounts. Solo se aplica a sesiones iniciadas con esta versión (necesitan el ID Token guardado).
 - **Back-channel:** registra en Accounts la dirección `https://tu-app/auth/accounts/backchannel-logout`. Cuando la sesión central termina (cierre en otra app, cierre de todas las sesiones, cambio de contraseña, suspensión), Accounts avisa y la sesión local se cierra en su siguiente petición. Requiere una caché compartida por todos los servidores de la app (no `array`).
 
+## Perfil central
+
+El nombre, el correo y la contraseña se editan solo en Accounts. Las apps no deben ofrecer su propio formulario para esos datos: enlaza a `accounts_account_url()` (por defecto `{ACCOUNTS_ISSUER}/account`, configurable con `ACCOUNTS_ACCOUNT_URL`).
+
+Los cambios llegan a la copia local sin que la persona vuelva a iniciar sesión: la introspección que `accounts.access` hace cada ≤60 s devuelve una huella del perfil (`accounts_profile_version`); si cambia, el paquete lee UserInfo y actualiza el usuario con tu `user_resolver`. Si UserInfo falla, la petición sigue y se reintenta en la siguiente validación.
+
 ## Usuarios
 
 La identidad se vincula por `(issuer, sub)`, **nunca por correo**: un usuario local con el mismo correo no se toma ni se enlaza.
@@ -171,6 +177,7 @@ public function actingAs(Authenticatable $user, $guard = null): static
 | `home` | `/` | `ACCOUNTS_HOME`. |
 | `scopes` | `openid profile email` | |
 | `http.connect_timeout` / `http.timeout` | 2 s / 3 s | `ACCOUNTS_CONNECT_TIMEOUT`, `ACCOUNTS_TIMEOUT`. |
+| `account_url` | `{issuer}/account` | `ACCOUNTS_ACCOUNT_URL`. |
 | `global_logout` | `false` | `ACCOUNTS_GLOBAL_LOGOUT`. Ver «Cierre de sesión central». |
 | `post_logout_redirect` | — | `ACCOUNTS_POST_LOGOUT_REDIRECT_URI`. |
 | `validation_seconds` | 60 | Plazo máximo de una validación. No ampliar sin medirlo. |

@@ -62,6 +62,28 @@ final class AccountsSession
         return $this->decrypt('refresh_token');
     }
 
+    public function subject(): ?string
+    {
+        $value = $this->value('subject');
+
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * The fingerprint of the profile as of the last time this app read it.
+     */
+    public function profileVersion(): ?string
+    {
+        $value = $this->value('profile_version');
+
+        return is_string($value) ? $value : null;
+    }
+
+    public function markProfileVersion(string $version): void
+    {
+        $this->update(['profile_version' => $version]);
+    }
+
     public function idToken(): ?string
     {
         return $this->decrypt('id_token');

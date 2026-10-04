@@ -10,12 +10,14 @@ use LuisML\AccountsClient\AccountsSession;
 use LuisML\AccountsClient\AccountsUnavailable;
 use LuisML\AccountsClient\Actions\AccountsHttp;
 use LuisML\AccountsClient\Actions\RefreshAccountsSession;
+use LuisML\AccountsClient\Actions\SyncProfile;
 use LuisML\AccountsClient\Http\Controllers\AccountsBackchannelLogoutController;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class EnsureAccountsAccess
 {
-    public function __construct(private AccountsHttp $http, private RefreshAccountsSession $refresh) {}
+    public function __construct(private AccountsHttp $http, private RefreshAccountsSession $refresh, private SyncProfile $profile) {}
 
     /**
      * Every protected operation passes through here. A validation is good for at most the configured
@@ -69,8 +71,29 @@ class EnsureAccountsAccess
         }
 
         $state->validated($startedAt, $response->json('accounts_session_expires_at'));
+        $this->refreshProfile($state, $response->json('accounts_profile_version'));
 
         return $next($request);
+    }
+
+    /**
+     * The introspection carries a fingerprint of the profile. When it differs from the one this
+     * session last saw (the first validation of a session has none), the local copy of name and
+     * email is refreshed; if that fails the request goes on and it is tried again next time.
+     */
+    private function refreshProfile(AccountsSession $state, mixed $version): void
+    {
+        if (! is_string($version) || $version === $state->profileVersion()) {
+            return;
+        }
+
+        try {
+            if ($this->profile->handle($state)) {
+                $state->markProfileVersion($version);
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     /**

@@ -34,6 +34,12 @@ return [
     'scopes' => ['openid', 'profile', 'email'],
 
     /*
+    | Where people manage their central account. Null means `{issuer}/account`.
+    */
+
+    'account_url' => env('ACCOUNTS_ACCOUNT_URL'),
+
+    /*
     |--------------------------------------------------------------------------
     | Logout
     |--------------------------------------------------------------------------

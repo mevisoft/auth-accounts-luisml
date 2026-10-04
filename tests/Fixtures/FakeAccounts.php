@@ -36,6 +36,12 @@ class FakeAccounts
 
     public string $subject = 'subject-1';
 
+    public string $name = 'Ana Pérez';
+
+    public string $profileVersion = 'profile-v1';
+
+    public bool $userInfoFails = false;
+
     /** @var array<string, mixed> claims added to the ID Token Accounts answers the code with */
     public array $idTokenClaims = [];
 
@@ -81,10 +87,11 @@ class FakeAccounts
                 ]),
                 $path === '/oauth/jwks' => Http::response(['keys' => [$this->jwk()]]),
                 $path === '/oauth/token' => $this->token($request),
-                $path === '/oauth/userinfo' => Http::response(['sub' => $this->subject, 'name' => 'Ana Pérez', 'email' => 'ana@example.test', 'email_verified' => true]),
+                $path === '/oauth/userinfo' && $this->userInfoFails => Http::response([], 500),
+                $path === '/oauth/userinfo' => Http::response(['sub' => $this->subject, 'name' => $this->name, 'email' => 'ana@example.test', 'email_verified' => true]),
                 $path === '/oauth/introspect' && $this->introspectionStatus !== null => Http::response(['error' => 'invalid_client'], $this->introspectionStatus),
                 $path === '/oauth/introspect' => Http::response($this->introspectionActive
-                    ? ['active' => true, 'sub' => $this->subject, 'accounts_session_expires_at' => now()->addSeconds($this->sessionExpiresIn)->getTimestamp()]
+                    ? ['active' => true, 'sub' => $this->subject, 'accounts_session_expires_at' => now()->addSeconds($this->sessionExpiresIn)->getTimestamp(), 'accounts_profile_version' => $this->profileVersion]
                     : ['active' => false]),
                 $path === '/oauth/revoke' => $this->revokeFails ? Http::response([], 500) : Http::response([]),
                 $path === '/api/v1/session-activity' => $this->activityFails
