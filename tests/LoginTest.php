@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 use LuisML\AccountsClient\Tests\Fixtures\User;
 
 test('login sends the person to Accounts with state, nonce and S256 PKCE', function () {
@@ -218,4 +219,18 @@ test('an email Accounts verified arrives verified, because Accounts is the autho
     $this->login();
 
     expect(User::firstOrFail()->email_verified_at)->not->toBeNull();
+});
+
+test('a rejected sign-in logs why, so the failing step can be told apart', function () {
+    Log::spy();
+    $this->accounts->userInfoFails = true;
+    $login = $this->beginLogin();
+    $this->accounts->lastNonce = ['nonce' => $login['nonce']];
+
+    $this->get('/auth/accounts/callback?'.http_build_query(['code' => 'code-1', 'state' => $login['state']]))->assertRedirect('/');
+
+    $this->assertGuest();
+    Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context): bool => $message === 'Acceso con LuisML rechazado.'
+        && $context['reason'] === RuntimeException::class
+        && str_contains($context['message'], 'UserInfo'))->once();
 });

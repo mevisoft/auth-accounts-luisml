@@ -2,14 +2,16 @@
 
 namespace LuisML\AccountsClient\Http\Controllers;
 
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use LuisML\AccountsClient\AccountsUnavailable;
 use LuisML\AccountsClient\Actions\BeginLogin;
+use LuisML\AccountsClient\Http\Controllers\Concerns\LeavesTheApplication;
 
 class AccountsLoginController extends Controller
 {
+    use LeavesTheApplication;
+
     public function __invoke(Request $request, BeginLogin $begin)
     {
         $intended = $request->session()->get('url.intended');
@@ -29,6 +31,6 @@ class AccountsLoginController extends Controller
             ], 503, ['Retry-After' => '10']);
         }
 
-        return new RedirectResponse($url);
+        return $this->leaveTo($request, $url);
     }
 }

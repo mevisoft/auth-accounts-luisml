@@ -4,9 +4,12 @@ namespace LuisML\AccountsClient\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use LuisML\AccountsClient\Http\Controllers\Concerns\LeavesTheApplication;
 
 class AccountsEntryController extends Controller
 {
+    use LeavesTheApplication;
+
     /**
      * Seconds within which a second visit means the automatic sign-in did not work.
      */
@@ -29,6 +32,6 @@ class AccountsEntryController extends Controller
 
         $request->session()->put('accounts.auto_login_at', now()->getTimestamp());
 
-        return redirect()->route('accounts.login', $request->only(['acr_values', 'max_age', 'prompt']));
+        return $this->leaveTo($request, route('accounts.login', $request->only(['acr_values', 'max_age', 'prompt'])));
     }
 }

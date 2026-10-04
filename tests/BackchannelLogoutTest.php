@@ -71,3 +71,14 @@ test('signing out sends the browser to end the central session only when global 
     $this->assertGuest();
     expect(Auth::check())->toBeFalse();
 });
+
+test('an Inertia sign-out is told to make a full visit to the central logout, not a cross-origin redirect', function () {
+    config(['accounts.global_logout' => true, 'accounts.post_logout_redirect' => 'https://app.example.test/bye']);
+    signedInWithSession('sid-1');
+
+    $response = $this->withHeader('X-Inertia', 'true')->post('/auth/accounts/logout');
+
+    $response->assertStatus(409);
+    expect($response->headers->get('X-Inertia-Location'))->toStartWith('https://accounts.example.test/oauth/end-session?')
+        ->and($response->headers->get('Location'))->toBeNull();
+});

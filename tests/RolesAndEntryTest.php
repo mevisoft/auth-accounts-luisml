@@ -82,3 +82,10 @@ test('after the loop window the automatic redirect works again', function () {
 test('a protected page sends a guest to login, which sends them to Accounts', function () {
     $this->get('/protected')->assertRedirect(route('accounts.login'));
 });
+
+test('an Inertia visit to the login address is told to make a full visit, so it never follows a cross-origin redirect', function () {
+    $response = $this->withHeader('X-Inertia', 'true')->get('/login');
+
+    $response->assertStatus(409);
+    expect($response->headers->get('X-Inertia-Location'))->toBe(route('accounts.login'));
+});

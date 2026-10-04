@@ -7,14 +7,17 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
-use LuisML\AccountsClient\Actions\Discovery;
 use LuisML\AccountsClient\AccountsSession;
 use LuisML\AccountsClient\Actions\AccountsHttp;
+use LuisML\AccountsClient\Actions\Discovery;
+use LuisML\AccountsClient\Http\Controllers\Concerns\LeavesTheApplication;
 use LuisML\AccountsClient\Jobs\RevokeAccountsAccess;
 use Throwable;
 
 class AccountsLogoutController extends Controller
 {
+    use LeavesTheApplication;
+
     /**
      * Local sign-out: destroy this app's session always, and ask Accounts to revoke this browser's
      * access. If that cannot be confirmed now, a durable job retries it and the person is told.
@@ -46,7 +49,7 @@ class AccountsLogoutController extends Controller
         $request->session()->regenerateToken();
 
         if ($endSession !== null) {
-            return redirect()->away($endSession);
+            return $this->leaveTo($request, $endSession);
         }
 
         return redirect()->to(config('accounts.home'))->with('status', $confirmed
