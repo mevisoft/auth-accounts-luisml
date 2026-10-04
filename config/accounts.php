@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'issuer' => env('ACCOUNTS_ISSUER'),
+    'issuer' => env('ACCOUNTS_ISSUER', 'https://accounts.luisml.com'),
 
     'client_id' => env('ACCOUNTS_CLIENT_ID'),
 

@@ -26,7 +26,7 @@ Requisitos: PHP ^8.2 y Laravel ^11, ^12 o ^13.
    Copia el *client id* y el *secreto* (se muestra una sola vez) a `.env`:
 
    ```dotenv
-   ACCOUNTS_ISSUER=https://accounts.luisml.test
+   ACCOUNTS_ISSUER=https://accounts.luisml.com   # opcional: es el valor por defecto
    ACCOUNTS_CLIENT_ID=...
    ACCOUNTS_CLIENT_SECRET=...
    ACCOUNTS_REDIRECT_URI="${APP_URL}/auth/accounts/callback"

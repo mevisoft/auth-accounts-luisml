@@ -58,7 +58,7 @@ class InstallCommand extends Command
     ];
 
     private const VARIABLES = [
-        'ACCOUNTS_ISSUER' => '',
+        'ACCOUNTS_ISSUER' => 'https://accounts.luisml.com',
         'ACCOUNTS_CLIENT_ID' => '',
         'ACCOUNTS_CLIENT_SECRET' => '',
         'ACCOUNTS_REDIRECT_URI' => '"${APP_URL}/auth/accounts/callback"',
