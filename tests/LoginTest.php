@@ -13,7 +13,7 @@ test('login sends the person to Accounts with state, nonce and S256 PKCE', funct
             'response_type' => 'code',
             'client_id' => 'client-id-1',
             'redirect_uri' => 'https://app.example.test/auth/accounts/callback',
-            'scope' => 'openid profile email',
+            'scope' => 'openid profile email roles',
             'code_challenge_method' => 'S256',
         ])
         ->and($query['state'])->toHaveLength(40)

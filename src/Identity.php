@@ -13,5 +13,7 @@ final readonly class Identity
         public ?string $name,
         public ?string $email,
         public bool $emailVerified,
+        /** @var list<string> the roles Accounts assigns in this application */
+        public array $roles = [],
     ) {}
 }

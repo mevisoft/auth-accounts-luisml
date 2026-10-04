@@ -29,6 +29,12 @@ class ResolveModelUser
             'email' => $identity->email,
         ], fn ($value) => $value !== null));
 
+        // Roles are assigned in Accounts; a missing list means none, so a revoked role never lingers.
+        if (Schema::hasColumn($user->getTable(), 'accounts_roles')) {
+            // Stored as JSON by hand when the model does not cast the column (no HasAccountsRoles trait).
+            $user->forceFill(['accounts_roles' => $user->hasCast('accounts_roles') ? $identity->roles : json_encode($identity->roles)]);
+        }
+
         // Accounts is the authority on email verification: a verified email there is verified here.
         if ($identity->emailVerified && $identity->email !== null && Schema::hasColumn($user->getTable(), 'email_verified_at') && $user->email_verified_at === null) {
             $user->forceFill(['email_verified_at' => now()]);

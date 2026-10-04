@@ -26,7 +26,7 @@ test('only the authentication parameters the client understands reach Accounts',
         'scope' => 'admin',
     ]);
 
-    expect($authorize)->toMatchArray(['acr_values' => 'urn:accounts:acr:phr', 'max_age' => '300', 'prompt' => 'login', 'scope' => 'openid profile email'])
+    expect($authorize)->toMatchArray(['acr_values' => 'urn:accounts:acr:phr', 'max_age' => '300', 'prompt' => 'login', 'scope' => 'openid profile email roles'])
         ->not->toHaveKey('login_hint');
 
     $invalid = loginWith(['acr_values' => 'bad value; drop', 'max_age' => '-1', 'prompt' => 'none']);

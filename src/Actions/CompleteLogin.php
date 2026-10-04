@@ -57,6 +57,7 @@ class CompleteLogin
             name: $info->json('name'),
             email: $info->json('email'),
             emailVerified: (bool) $info->json('email_verified', false),
+            roles: array_values(array_filter((array) $info->json('roles', []), 'is_string')),
         );
 
         $user = app((string) config('accounts.user_resolver'))($identity)

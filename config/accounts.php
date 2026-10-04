@@ -31,7 +31,7 @@ return [
 
     'home' => env('ACCOUNTS_HOME', '/'),
 
-    'scopes' => ['openid', 'profile', 'email'],
+    'scopes' => ['openid', 'profile', 'email', 'roles'],
 
     /*
     | Where people manage their central account. Null means `{issuer}/account`.
@@ -98,6 +98,9 @@ return [
 
     'routes' => [
         'prefix' => 'auth/accounts',
+
+        // Registers GET /login (route name `login`), which sends guests straight to Accounts.
+        'login' => true,
     ],
 
 ];

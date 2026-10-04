@@ -81,6 +81,27 @@ El prefijo se cambia con `accounts.routes.prefix`.
 - **Global:** con `ACCOUNTS_GLOBAL_LOGOUT=true` el cierre también termina la sesión central en Accounts (RP-initiated logout, con `id_token_hint`) y vuelve a `ACCOUNTS_POST_LOGOUT_REDIRECT_URI`, que debe estar registrada para esta app en Accounts. Solo se aplica a sesiones iniciadas con esta versión (necesitan el ID Token guardado).
 - **Back-channel:** registra en Accounts la dirección `https://tu-app/auth/accounts/backchannel-logout`. Cuando la sesión central termina (cierre en otra app, cierre de todas las sesiones, cambio de contraseña, suspensión), Accounts avisa y la sesión local se cierra en su siguiente petición. Requiere una caché compartida por todos los servidores de la app (no `array`).
 
+## Roles
+
+Accounts asigna a cada cuenta roles gruesos por aplicación (por ejemplo `admin`). Se copian al iniciar sesión y se mantienen al día con la misma sincronización del perfil (en ≤60 s). En el modelo de usuario:
+
+```php
+use LuisML\AccountsClient\Concerns\HasAccountsRoles;
+
+class User extends Authenticatable
+{
+    use HasAccountsRoles; // columna accounts_roles (la añade la migración del paquete)
+}
+
+$user->hasAccountsRole('admin');
+```
+
+Si Accounts no manda `roles`, la persona queda sin roles (falla cerrado). Los permisos finos siguen siendo de cada app.
+
+## Entrada y `login`
+
+El paquete registra `GET /login` (nombre `login`, desactivable con `accounts.routes.login = false`): lleva al invitado directo a Accounts. Si vuelve a `/login` en menos de 30 s (el callback falló y la página protegida lo rebotó), muestra un botón manual en lugar de redirigir de nuevo, así que una caída de Accounts nunca provoca un bucle.
+
 ## Perfil central
 
 El nombre, el correo y la contraseña se editan solo en Accounts. Las apps no deben ofrecer su propio formulario para esos datos: enlaza a `accounts_account_url()` (por defecto `{ACCOUNTS_ISSUER}/account`, configurable con `ACCOUNTS_ACCOUNT_URL`).
@@ -175,7 +196,7 @@ public function actingAs(Authenticatable $user, $guard = null): static
 |---|---|---|
 | `issuer`, `client_id`, `client_secret`, `redirect` | — | Del entorno (`ACCOUNTS_*`). |
 | `home` | `/` | `ACCOUNTS_HOME`. |
-| `scopes` | `openid profile email` | |
+| `scopes` | `openid profile email roles` | `roles` entrega los roles que Accounts asigna en esta app (hay que permitirlo para la app en el panel de Accounts). |
 | `http.connect_timeout` / `http.timeout` | 2 s / 3 s | `ACCOUNTS_CONNECT_TIMEOUT`, `ACCOUNTS_TIMEOUT`. |
 | `account_url` | `{issuer}/account` | `ACCOUNTS_ACCOUNT_URL`. |
 | `global_logout` | `false` | `ACCOUNTS_GLOBAL_LOGOUT`. Ver «Cierre de sesión central». |
