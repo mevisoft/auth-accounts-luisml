@@ -87,14 +87,17 @@ Accounts asigna a cada cuenta roles gruesos por aplicación (por ejemplo `admin`
 
 ```php
 use LuisML\AccountsClient\Concerns\HasAccountsRoles;
+use LuisML\AccountsClient\Roles;
 
 class User extends Authenticatable
 {
     use HasAccountsRoles; // columna accounts_roles (la añade la migración del paquete)
 }
 
-$user->hasAccountsRole('admin');
+$user->hasAccountsRole(Roles::ADMIN);
 ```
+
+Los roles compartidos de Accounts están en `LuisML\AccountsClient\Roles` (`OWNER`, `ADMIN` y `MEMBER`). Cada app puede ofrecer además roles propios, que se leen como cadenas.
 
 Si Accounts no manda `roles`, la persona queda sin roles (falla cerrado). Los permisos finos siguen siendo de cada app.
 

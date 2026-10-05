@@ -1,5 +1,6 @@
 <?php
 
+use LuisML\AccountsClient\Roles;
 use LuisML\AccountsClient\Tests\Fixtures\User;
 
 test('the roles Accounts assigns are stored at sign-in', function () {
@@ -11,6 +12,17 @@ test('the roles Accounts assigns are stored at sign-in', function () {
     expect($user->accountsRoles())->toBe(['admin'])
         ->and($user->hasAccountsRole('admin'))->toBeTrue()
         ->and($user->hasAccountsRole('other'))->toBeFalse();
+});
+
+test('the shared roles are the ones Accounts delivers', function () {
+    $this->accounts->roles = [Roles::OWNER, Roles::MEMBER];
+    $this->login();
+
+    $user = User::firstOrFail();
+
+    expect([Roles::OWNER, Roles::ADMIN, Roles::MEMBER])->toBe(['owner', 'admin', 'member'])
+        ->and($user->hasAccountsRole(Roles::OWNER))->toBeTrue()
+        ->and($user->hasAccountsRole(Roles::ADMIN))->toBeFalse();
 });
 
 test('a user without the roles claim has no roles, so nothing lingers', function () {
