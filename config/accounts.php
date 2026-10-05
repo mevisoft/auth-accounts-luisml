@@ -1,5 +1,7 @@
 <?php
 
+use LuisML\AccountsClient\Actions\ResolveModelUser;
+
 return [
 
     /*
@@ -94,7 +96,7 @@ return [
 
     'user_model' => 'App\\Models\\User',
 
-    'user_resolver' => LuisML\AccountsClient\Actions\ResolveModelUser::class,
+    'user_resolver' => ResolveModelUser::class,
 
     'routes' => [
         'prefix' => 'auth/accounts',

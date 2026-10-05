@@ -14,35 +14,47 @@ class AccountsHttp
     {
         return Http::connectTimeout((int) config('accounts.http.connect_timeout'))
             ->timeout((int) config('accounts.http.timeout'))
-            ->acceptJson();
+            ->acceptJson()
+            ->asForm()
+            ->baseUrl(rtrim((string) config('accounts.issuer'), '/'));
     }
 
     /**
-     * A POST with the client's credentials (client_secret_post). Network failures and 5xx are
-     * "unavailable": they say nothing about the access and are never retried automatically.
+     * Send a POST request authenticated with the client's credentials
+     * using client_secret_post.
+     *
+     * Network failures, rate limiting, and 5xx responses are treated as
+     * service unavailability and are never retried automatically.
      *
      * @param  array<string, mixed>  $data
+     *
+     * @throws AccountsUnavailable
      */
-    public function post(string $path, array $data, ?string $bearer = null): Response
+    public function post(string $path, array $data = [], ?string $bearer = null): Response
     {
-        $request = $this->client()->asForm();
+        $request = $this->client();
 
         if ($bearer !== null) {
-            $request = $request->withToken($bearer);
+            $request->withToken($bearer);
         }
 
         try {
-            $response = $request->post(rtrim((string) config('accounts.issuer'), '/').$path, [
+            $response = $request->post($path, [
                 'client_id' => config('accounts.client_id'),
                 'client_secret' => config('accounts.client_secret'),
                 ...$data,
             ]);
         } catch (ConnectionException $exception) {
-            throw new AccountsUnavailable('Accounts no respondió.', previous: $exception);
+            throw new AccountsUnavailable(
+                'Accounts no respondió.',
+                previous: $exception,
+            );
         }
 
-        if ($response->serverError() || $response->status() === 429) {
-            throw new AccountsUnavailable("Accounts respondió {$response->status()}.");
+        if ($response->serverError() || $response->tooManyRequests()) {
+            throw new AccountsUnavailable(
+                "Accounts respondió {$response->status()}.",
+            );
         }
 
         return $response;
