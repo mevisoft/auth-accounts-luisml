@@ -213,7 +213,7 @@ public function actingAs(Authenticatable $user, $guard = null): static
 | `issuer`, `client_id`, `client_secret`, `redirect` | — | Del entorno (`ACCOUNTS_*`). |
 | `home` | `/` | `ACCOUNTS_HOME`. |
 | `scopes` | `openid profile email roles` | `roles` entrega los roles que Accounts asigna en esta app (hay que permitirlo para la app en el panel de Accounts). |
-| `http.connect_timeout` / `http.timeout` | 2 s / 3 s | `ACCOUNTS_CONNECT_TIMEOUT`, `ACCOUNTS_TIMEOUT`. |
+| `http.connect_timeout` / `http.timeout` | 10 s / 10 s | `ACCOUNTS_CONNECT_TIMEOUT`, `ACCOUNTS_TIMEOUT`. |
 | `account_url` | `{issuer}/account` | `ACCOUNTS_ACCOUNT_URL`. |
 | `global_logout` | `false` | `ACCOUNTS_GLOBAL_LOGOUT`. Ver «Cierre de sesión central». |
 | `post_logout_redirect` | — | `ACCOUNTS_POST_LOGOUT_REDIRECT_URI`. |

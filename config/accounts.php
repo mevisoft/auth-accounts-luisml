@@ -63,8 +63,8 @@ return [
     */
 
     'http' => [
-        'connect_timeout' => (int) env('ACCOUNTS_CONNECT_TIMEOUT', 2),
-        'timeout' => (int) env('ACCOUNTS_TIMEOUT', 3),
+        'connect_timeout' => (int) env('ACCOUNTS_CONNECT_TIMEOUT', 10),
+        'timeout' => (int) env('ACCOUNTS_TIMEOUT', 10),
     ],
 
     // How long a successful validation of the access may serve protected operations.
