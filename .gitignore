@@ -2,3 +2,5 @@
 composer.lock
 .phpunit.cache
 .idea
+/bin
+AUDIT.md
