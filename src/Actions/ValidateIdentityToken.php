@@ -3,6 +3,7 @@
 namespace LuisML\AccountsClient\Actions;
 
 use DateInterval;
+use DateTimeImmutable;
 use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
@@ -32,7 +33,14 @@ class ValidateIdentityToken
     {
         $token = $this->verified($jwt);
 
-        if (! hash_equals($nonce, (string) $token->claims()->get('nonce', ''))) {
+        $claims = $token->claims();
+        $actualNonce = $claims->get('nonce');
+        $authTime = $claims->get('auth_time');
+
+        if (! is_string($actualNonce) || ! hash_equals($nonce, $actualNonce)
+            || ! is_string($claims->get('sub')) || $claims->get('sub') === ''
+            || ($claims->has('auth_time') && (! is_int($authTime) || $authTime < 0
+                || $authTime > now()->getTimestamp() + (int) config('accounts.clock_skew_seconds')))) {
             throw new RuntimeException('ID Token inválido.');
         }
 
@@ -54,7 +62,9 @@ class ValidateIdentityToken
         if (! is_array($events) || ! array_key_exists('http://schemas.openid.net/event/backchannel-logout', $events)
             || $claims->has('nonce')
             || ! is_string($claims->get('jti'))
-            || ! is_string($claims->get('sid'))) {
+            || $claims->get('jti') === ''
+            || ! is_string($claims->get('sid'))
+            || $claims->get('sid') === '') {
             throw new RuntimeException('Token de cierre de sesión inválido.');
         }
 
@@ -91,7 +101,8 @@ class ValidateIdentityToken
             new LooseValidAt(new SystemClock, new DateInterval('PT'.(int) config('accounts.clock_skew_seconds').'S')),
         );
 
-        if (! $valid || ! is_string($token->claims()->get('sub'))) {
+        if (! $valid || ! $token->claims()->get('iat') instanceof DateTimeImmutable
+            || ! $token->claims()->get('exp') instanceof DateTimeImmutable) {
             throw new RuntimeException('ID Token inválido.');
         }
 

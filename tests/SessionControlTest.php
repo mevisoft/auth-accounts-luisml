@@ -217,6 +217,7 @@ test('logging out revokes this browser access and destroys the local session', f
 });
 
 test('if the revocation cannot be confirmed, a durable job retries it and the person is told', function () {
+    config(['queue.default' => 'database']);
     Queue::fake();
     $this->accounts->revokeFails = true;
 

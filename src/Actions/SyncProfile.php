@@ -2,6 +2,8 @@
 
 namespace LuisML\AccountsClient\Actions;
 
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\Auth;
 use LuisML\AccountsClient\AccountsSession;
 use LuisML\AccountsClient\Identity;
 
@@ -22,20 +24,29 @@ class SyncProfile
             return false;
         }
 
-        $info = $this->http->client()->withToken($token)->get($this->discovery->metadata()['userinfo_endpoint']);
+        $info = $this->http->get($this->discovery->metadata()['userinfo_endpoint'], $token);
 
         if (! $info->successful() || $info->json('sub') !== $subject) {
             return false;
         }
 
-        app((string) config('accounts.user_resolver'))(new Identity(
-            issuer: (string) config('accounts.issuer'),
-            subject: $subject,
-            name: $info->json('name'),
-            email: $info->json('email'),
-            emailVerified: (bool) $info->json('email_verified', false),
-            roles: array_values(array_filter((array) $info->json('roles', []), 'is_string')),
+        $user = app((string) config('accounts.user_resolver'))(Identity::fromUserInfo(
+            (string) config('accounts.issuer'), $subject, $info->json(),
         ));
+
+        if (! $user instanceof Authenticatable) {
+            return false;
+        }
+
+        // The guard already loaded a different model instance earlier in this request.
+        // Replace it so downstream policies see role revocations immediately.
+        if (Auth::check()) {
+            if ((string) Auth::id() !== (string) $user->getAuthIdentifier()) {
+                return false;
+            }
+
+            Auth::setUser($user);
+        }
 
         return true;
     }

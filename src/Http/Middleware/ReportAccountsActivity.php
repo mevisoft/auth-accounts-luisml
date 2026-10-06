@@ -57,7 +57,6 @@ class ReportAccountsActivity
         }
 
         $state->markReported();
-        $startedAt = now()->getTimestamp();
 
         try {
             $response = $this->http->post('/api/v1/session-activity', [], $state->accessToken());
@@ -65,8 +64,10 @@ class ReportAccountsActivity
             return;
         }
 
-        if ($response->successful() && $response->json('data.session_expires_at') !== null) {
-            $state->validated($startedAt, (int) $response->json('data.session_expires_at'));
+        $expiresAt = $response->json('data.session_expires_at');
+
+        if ($response->successful() && is_int($expiresAt)) {
+            $state->activityConfirmed($expiresAt);
         }
     }
 }

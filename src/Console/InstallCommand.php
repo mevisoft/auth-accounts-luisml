@@ -230,7 +230,7 @@ PHP;
         $this->newLine();
         $this->info('Checking the connection with Accounts:');
 
-        $issuer = rtrim((string) config('accounts.issuer'), '/');
+        $issuer = (string) config('accounts.issuer');
 
         if ($issuer === '') {
             $this->error('ACCOUNTS_ISSUER is empty.');
@@ -243,7 +243,7 @@ PHP;
         }
 
         try {
-            $document = \Illuminate\Support\Facades\Http::timeout(5)->get($issuer.'/.well-known/openid-configuration');
+            $document = \Illuminate\Support\Facades\Http::timeout(5)->get(rtrim($issuer, '/').'/.well-known/openid-configuration');
         } catch (\Throwable $exception) {
             $this->error("Accounts is not reachable at {$issuer}: ".$exception->getMessage());
 
@@ -350,6 +350,19 @@ PHP;
         }
 
         $blocked = $found->mapWithKeys(fn ($reference, $file) => [$file => $this->referencedBy($file, $reference, $found->keys()->all())])->filter();
+
+        // A retained controller/page can depend on another conflict. Keep that dependency,
+        // and its dependencies, instead of excluding every conflict from reference checks.
+        do {
+            $previousCount = $blocked->count();
+            $removableFiles = $found->keys()->diff($blocked->keys())->all();
+
+            foreach ($found->except($blocked->keys()->all()) as $file => $reference) {
+                if (($usedBy = $this->referencedBy($file, $reference, $removableFiles)) !== null) {
+                    $blocked->put($file, $usedBy);
+                }
+            }
+        } while ($blocked->count() !== $previousCount);
 
         foreach ($found as $file => $reference) {
             $this->line("  - {$file}".($blocked->has($file) ? "  (still used by {$blocked[$file]}: edit that first)" : ''));

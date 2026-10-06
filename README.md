@@ -75,11 +75,24 @@ El prefijo se cambia con `accounts.routes.prefix`.
   - Para pedirlo en un login concreto: `route('accounts.login', ['acr_values' => 'urn:accounts:acr:phr', 'max_age' => 300])`. Solo `acr_values`, `max_age` y `prompt` (`login` o `consent`) llegan a Accounts.
 - **`accounts.activity`**: informa a Accounts de actividad real, como mucho cada 15 s. Ignora el polling, el prefetch y las respuestas con error.
 
+Los reportes de actividad pueden prolongar la sesión central, pero no reinician el plazo de introspección.
+Así, una persona que navega continuamente también recibe los cambios de perfil y roles.
+
+La renovación de tokens requiere una caché persistente compartida por los workers, con soporte de locks.
+Además del bloqueo, se conserva el resultado cifrado por generación de tokens durante al menos la duración
+de la sesión local: las peticiones que ya cargaron una copia antigua de la sesión reutilizan ese resultado.
+Un resultado ambiguo obliga a autorizar de nuevo. La protección depende de que esos registros no se pierdan
+ni se eliminen de la caché durante ese plazo; `array` sirve solo para pruebas.
+
 ## Cierre de sesión central
 
 - **Local (por defecto):** `POST accounts.logout` cierra la sesión de esta app y revoca su acceso.
 - **Global:** con `ACCOUNTS_GLOBAL_LOGOUT=true` el cierre también termina la sesión central en Accounts (RP-initiated logout, con `id_token_hint`) y vuelve a `ACCOUNTS_POST_LOGOUT_REDIRECT_URI`, que debe estar registrada para esta app en Accounts. Solo se aplica a sesiones iniciadas con esta versión (necesitan el ID Token guardado).
 - **Back-channel:** registra en Accounts la dirección `https://tu-app/auth/accounts/backchannel-logout`. Cuando la sesión central termina (cierre en otra app, cierre de todas las sesiones, cambio de contraseña, suspensión), Accounts avisa y la sesión local se cierra en su siguiente petición. Requiere una caché compartida por todos los servidores de la app (no `array`).
+
+Los reintentos de revocación necesitan una cola persistente y un worker. Con `sync` no hay reintentos
+durables. Una caída de la cola no impide cerrar la sesión local; el mensaje indica cuando no se pudo
+programar el reintento.
 
 ## Roles
 

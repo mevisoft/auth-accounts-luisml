@@ -13,7 +13,7 @@ final class AccountsSession
 {
     private const KEY = 'accounts.session';
 
-    public function __construct(private Session $session) {}
+    public function __construct(private readonly Session $session) {}
 
     public static function for(Session $session): self
     {
@@ -152,6 +152,17 @@ final class AccountsSession
     public function markReported(): void
     {
         $this->update(['last_report_at' => now()->getTimestamp()]);
+    }
+
+    /**
+     * Activity can extend the central session, but must not postpone introspection/profile sync.
+     */
+    public function activityConfirmed(int $sessionExpiresAt): void
+    {
+        $this->update([
+            'session_expires_at' => $sessionExpiresAt,
+            'validated_until' => min($this->validatedUntil(), $sessionExpiresAt),
+        ]);
     }
 
     /**

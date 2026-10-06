@@ -13,7 +13,7 @@ class AccountsBackchannelLogoutController extends Controller
 {
     public static function cacheKey(string $sid): string
     {
-        return 'accounts-client:ended-session:'.hash('sha256', $sid);
+        return 'accounts-client:ended-session:'.hash('sha256', json_encode([config('accounts.issuer'), config('accounts.client_id'), $sid]));
     }
 
     /**
@@ -29,7 +29,10 @@ class AccountsBackchannelLogoutController extends Controller
             return $this->answer(['error' => 'invalid_request'], 400);
         }
 
-        if (! Cache::add('accounts-client:logout-jti:'.hash('sha256', $claims['jti']), true, 3600)) {
+        $replayKey = 'accounts-client:logout-jti:'.hash('sha256', json_encode([config('accounts.issuer'), config('accounts.client_id'), $claims['jti']]));
+        $replaySeconds = max(1, $claims['exp']->getTimestamp() + (int) config('accounts.clock_skew_seconds') - now()->getTimestamp());
+
+        if (! Cache::add($replayKey, true, $replaySeconds)) {
             return $this->answer(['error' => 'invalid_request'], 400);
         }
 

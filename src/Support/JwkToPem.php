@@ -2,16 +2,36 @@
 
 namespace LuisML\AccountsClient\Support;
 
+use RuntimeException;
+
 final class JwkToPem
 {
     /**
      * Build a PEM public key from the modulus and exponent of an RSA JWK.
      *
-     * @param  array<string, string>  $jwk
+     * @param  array<string, mixed>  $jwk
      */
     public static function convert(array $jwk): string
     {
-        $decode = fn (string $value): string => base64_decode(strtr($value, '-_', '+/').str_repeat('=', (4 - strlen($value) % 4) % 4));
+        if (($jwk['kty'] ?? null) !== 'RSA' || ($jwk['use'] ?? 'sig') !== 'sig'
+            || ($jwk['alg'] ?? 'RS256') !== 'RS256'
+            || (isset($jwk['key_ops']) && (! is_array($jwk['key_ops']) || ! in_array('verify', $jwk['key_ops'], true)))) {
+            throw new RuntimeException('Clave de firma RSA no permitida.');
+        }
+
+        $decode = function (mixed $value): string {
+            if (! is_string($value) || preg_match('/^[A-Za-z0-9_-]+$/D', $value) !== 1) {
+                throw new RuntimeException('Clave de firma RSA malformada.');
+            }
+
+            $decoded = base64_decode(strtr($value, '-_', '+/').str_repeat('=', (4 - strlen($value) % 4) % 4), true);
+
+            if ($decoded === false || $decoded === '' || trim($decoded, "\0") === '') {
+                throw new RuntimeException('Clave de firma RSA malformada.');
+            }
+
+            return $decoded;
+        };
         $length = fn (int $size): string => $size < 128 ? chr($size) : chr(0x80 | strlen(ltrim(pack('N', $size), "\0"))).ltrim(pack('N', $size), "\0");
         $integer = function (string $binary) use ($length): string {
             $binary = ord($binary[0]) > 127 ? "\0".$binary : $binary;
@@ -20,7 +40,7 @@ final class JwkToPem
         };
         $sequence = fn (string $content): string => "\x30".$length(strlen($content)).$content;
 
-        $rsaKey = $sequence($integer($decode($jwk['n'])).$integer($decode($jwk['e'])));
+        $rsaKey = $sequence($integer($decode($jwk['n'] ?? null)).$integer($decode($jwk['e'] ?? null)));
         $bitString = "\x03".$length(strlen($rsaKey) + 1)."\x00".$rsaKey;
         $algorithm = $sequence("\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x01\x01\x05\x00");
 

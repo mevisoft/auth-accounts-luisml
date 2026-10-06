@@ -28,12 +28,10 @@ class CompleteLogin
         $startedAt = now()->getTimestamp();
         $metadata = $this->discovery->metadata();
 
-        $tokens = $this->http->client()->asForm()->post($metadata['token_endpoint'], [
+        $tokens = $this->http->post($metadata['token_endpoint'], [
             'grant_type' => 'authorization_code',
             'code' => $code,
             'redirect_uri' => config('accounts.redirect'),
-            'client_id' => config('accounts.client_id'),
-            'client_secret' => config('accounts.client_secret'),
             'code_verifier' => $transaction['verifier'],
         ]);
 
@@ -41,40 +39,37 @@ class CompleteLogin
             throw new RuntimeException('Accounts rechazó el canje del código.');
         }
 
+        $payload = TokenResponse::tokens($tokens->json());
+
         $claims = $this->validate->handle($tokens->json('id_token'), $transaction['nonce']);
 
         $this->assertFreshEnough($claims, $transaction['max_age'] ?? null);
 
-        $info = $this->http->client()->withToken($tokens->json('access_token'))->get($metadata['userinfo_endpoint']);
+        $info = $this->http->get($metadata['userinfo_endpoint'], $payload['access_token']);
 
         if (! $info->successful() || $info->json('sub') !== $claims['sub']) {
             throw new RuntimeException('UserInfo no corresponde al ID Token.');
         }
 
-        $identity = new Identity(
-            issuer: (string) config('accounts.issuer'),
-            subject: $claims['sub'],
-            name: $info->json('name'),
-            email: $info->json('email'),
-            emailVerified: (bool) $info->json('email_verified', false),
-            roles: array_values(array_filter((array) $info->json('roles', []), 'is_string')),
+        $payload['expires_in'] -= now()->getTimestamp() - $startedAt;
+
+        if ($payload['expires_in'] <= 0) {
+            throw new RuntimeException('El token de acceso caducó durante el inicio de sesión.');
+        }
+
+        $identity = Identity::fromUserInfo(
+            (string) config('accounts.issuer'), $claims['sub'], $info->json(),
         );
 
         $user = app((string) config('accounts.user_resolver'))($identity)
             ?? throw new RuntimeException('La aplicación rechazó la identidad.');
 
-        Auth::login($user);
-        $request->session()->regenerate();
-
-        $payload = [
-            'access_token' => $tokens->json('access_token'),
-            'refresh_token' => $tokens->json('refresh_token'),
-            'expires_in' => (int) $tokens->json('expires_in'),
-        ];
-
         $session = AccountsSession::for($request->session());
         $session->store($payload, 0, null, $identity->subject, $claims, $tokens->json('id_token'));
         $session->validated($startedAt, null);
+
+        Auth::login($user);
+        $request->session()->regenerate();
 
         return $user;
     }

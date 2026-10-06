@@ -62,15 +62,25 @@ class EnsureAccountsAccess
             return $this->unavailable($request);
         }
 
-        if ($response->status() === 401) {
+        $active = $response->json('active');
+        $expiresAt = $response->json('accounts_session_expires_at');
+
+        if (! $response->successful() || ! is_bool($active)
+            || ($expiresAt !== null && ! is_int($expiresAt))) {
             return $this->unavailable($request);
         }
 
-        if (! $response->json('active')) {
+        if (! $active || ($response->json('sub') !== null && $response->json('sub') !== $state->subject())
+            || ($expiresAt !== null && $expiresAt <= now()->getTimestamp())) {
             return $this->reauthorize($request);
         }
 
-        $state->validated($startedAt, $response->json('accounts_session_expires_at'));
+        $state->validated($startedAt, $expiresAt);
+
+        if ($state->validatedUntil() <= now()->getTimestamp()) {
+            return $this->unavailable($request);
+        }
+
         $this->refreshProfile($state, $response->json('accounts_profile_version'));
 
         return $next($request);

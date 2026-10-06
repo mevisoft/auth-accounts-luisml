@@ -15,8 +15,8 @@ class AccountsCallbackController extends Controller
 {
     public function __invoke(Request $request, BeginLogin $begin, CompleteLogin $complete)
     {
-        $state = (string) $request->query('state');
-        $transaction = $state === '' ? null : $begin->consume($request, $state);
+        $state = $request->query('state');
+        $transaction = ! is_string($state) || $state === '' ? null : $begin->consume($request, $state);
 
         if ($transaction === null) {
             return $this->fail($request, 'La solicitud de acceso caducó o no es válida. Inténtalo de nuevo.');
@@ -28,9 +28,9 @@ class AccountsCallbackController extends Controller
                 : 'LuisML no pudo completar el acceso. Inténtalo de nuevo.');
         }
 
-        $code = (string) $request->query('code');
+        $code = $request->query('code');
 
-        if ($code === '') {
+        if (! is_string($code) || $code === '') {
             return $this->fail($request, 'LuisML no devolvió un código de acceso.');
         }
 

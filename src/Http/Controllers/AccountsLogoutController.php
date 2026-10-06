@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use LuisML\AccountsClient\AccountsSession;
 use LuisML\AccountsClient\Actions\AccountsHttp;
@@ -27,7 +28,16 @@ class AccountsLogoutController extends Controller
     {
         $state = AccountsSession::for($request->session());
         $token = $state->refreshToken() ?? $state->accessToken();
+        $idToken = $state->idToken();
+
+        // Local logout must finish even when revocation or the queue is unavailable.
+        $state->forget();
+        Auth::guard()->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
         $confirmed = $token === null;
+        $queued = false;
 
         if ($token !== null) {
             try {
@@ -37,16 +47,17 @@ class AccountsLogoutController extends Controller
             }
 
             if (! $confirmed) {
-                RevokeAccountsAccess::dispatch(Crypt::encryptString($token));
+                try {
+                    RevokeAccountsAccess::dispatch(Crypt::encryptString($token));
+                    $queued = config('queue.default') !== 'sync';
+                    $confirmed = ! $queued;
+                } catch (Throwable $exception) {
+                    Log::warning('No se pudo encolar la revocación de Accounts.', ['reason' => $exception::class]);
+                }
             }
         }
 
-        $endSession = $this->centralLogoutUrl($state->idToken(), $discovery);
-
-        $state->forget();
-        Auth::guard()->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        $endSession = $this->centralLogoutUrl($idToken, $discovery);
 
         if ($endSession !== null) {
             return $this->leaveTo($request, $endSession);
@@ -54,7 +65,9 @@ class AccountsLogoutController extends Controller
 
         return redirect()->to(config('accounts.home'))->with('status', $confirmed
             ? 'Cerraste sesión.'
-            : 'Cerraste sesión aquí. No pudimos confirmar el cierre en LuisML todavía; lo reintentaremos.');
+            : ($queued
+                ? 'Cerraste sesión aquí. No pudimos confirmar el cierre en LuisML todavía; lo reintentaremos.'
+                : 'Cerraste sesión aquí. No pudimos confirmar el cierre en LuisML ni programar un reintento.'));
     }
 
     /**
@@ -79,7 +92,7 @@ class AccountsLogoutController extends Controller
 
         $redirect = config('accounts.post_logout_redirect');
 
-        return $endpoint.'?'.http_build_query(array_filter([
+        return $endpoint.(str_contains($endpoint, '?') ? '&' : '?').http_build_query(array_filter([
             'id_token_hint' => $idToken,
             'post_logout_redirect_uri' => is_string($redirect) && $redirect !== '' ? $redirect : null,
             'state' => Str::random(20),

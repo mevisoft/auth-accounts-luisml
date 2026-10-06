@@ -44,7 +44,9 @@ class BeginLogin
 
         $request->session()->put(self::SESSION_KEY, $transactions);
 
-        return $metadata['authorization_endpoint'].'?'.http_build_query([
+        $endpoint = $metadata['authorization_endpoint'];
+
+        return $endpoint.(str_contains($endpoint, '?') ? '&' : '?').http_build_query([
             'response_type' => 'code',
             'client_id' => config('accounts.client_id'),
             'redirect_uri' => config('accounts.redirect'),

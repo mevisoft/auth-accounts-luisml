@@ -6,6 +6,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Crypt;
 use LuisML\AccountsClient\Actions\AccountsHttp;
+use RuntimeException;
 
 class RevokeAccountsAccess implements ShouldQueue
 {
@@ -26,7 +27,8 @@ class RevokeAccountsAccess implements ShouldQueue
         $response = $http->post('/oauth/revoke', ['token' => Crypt::decryptString($this->encryptedToken)]);
 
         if (! $response->successful()) {
-            $this->release(30);
+            // Throwing uses the queue's backoff and also reports failure with the sync driver.
+            throw new RuntimeException('Accounts rechazó la revocación del acceso.');
         }
     }
 

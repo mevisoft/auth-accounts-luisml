@@ -2,56 +2,109 @@
 
 namespace LuisML\AccountsClient\Actions;
 
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use LuisML\AccountsClient\AccountsUnavailable;
 
 class Discovery
 {
+    private const DISCOVERY_TTL = 86_400;
+
+    private const JWKS_TTL = 300;
+
+    private const JWKS_REFRESH_COOLDOWN = 60;
+
+    private const DISCOVERY_PATH = '/.well-known/openid-configuration';
+
     public function __construct(private AccountsHttp $http) {}
 
     /**
-     * The provider metadata, cached. The issuer it declares must equal the configured one exactly.
+     * Get the provider metadata.
      *
      * @return array<string, mixed>
      */
     public function metadata(): array
     {
-        return Cache::remember('accounts-client:discovery:'.md5((string) config('accounts.issuer')), 3600, function (): array {
-            $issuer = rtrim((string) config('accounts.issuer'), '/');
-            $document = $this->fetch($issuer.'/.well-known/openid-configuration');
+        $issuer = $this->issuer();
 
-            if (rtrim((string) ($document['issuer'] ?? ''), '/') !== $issuer) {
-                throw new AccountsUnavailable('El emisor del descubrimiento no coincide con el configurado.');
-            }
+        return Cache::remember(
+            $this->cacheKey('discovery'),
+            self::DISCOVERY_TTL,
+            function () use ($issuer): array {
+                $document = $this->fetch(self::DISCOVERY_PATH);
 
-            return $document;
-        });
+                if (($document['issuer'] ?? null) !== $issuer) {
+                    throw new AccountsUnavailable(
+                        'El emisor del descubrimiento no coincide con el configurado.'
+                    );
+                }
+
+                foreach (['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint', 'jwks_uri'] as $endpoint) {
+                    $url = $document[$endpoint] ?? null;
+
+                    if (! is_string($url) || filter_var($url, FILTER_VALIDATE_URL) === false
+                        || ! in_array(parse_url($url, PHP_URL_SCHEME), ['https', 'http'], true)
+                        || parse_url($url, PHP_URL_FRAGMENT) !== null
+                        || parse_url($url, PHP_URL_USER) !== null) {
+                        throw new AccountsUnavailable('El documento de descubrimiento contiene un endpoint inválido.');
+                    }
+                }
+
+                return $document;
+            },
+        );
     }
 
     /**
-     * Public keys by kid. An unknown kid refreshes the keys once, at most once a minute.
+     * Get the provider public keys indexed by kid.
      *
-     * @return array<string, array<string, string>>
+     * @return array<string, array<string, mixed>>
      */
     public function keys(bool $refresh = false): array
     {
-        $cacheKey = 'accounts-client:jwks:'.md5((string) config('accounts.issuer'));
+        $cacheKey = $this->cacheKey('jwks');
 
         if ($refresh) {
             Cache::forget($cacheKey);
         }
 
-        return Cache::remember($cacheKey, 300, function (): array {
-            $document = $this->fetch((string) $this->metadata()['jwks_uri']);
+        return Cache::remember(
+            $cacheKey,
+            self::JWKS_TTL,
+            function (): array {
+                $document = $this->fetch(
+                    (string) $this->metadata()['jwks_uri']
+                );
 
-            return collect($document['keys'] ?? [])->keyBy('kid')->all();
-        });
+                $keys = $document['keys'] ?? null;
+
+                if (! is_array($keys)) {
+                    throw new AccountsUnavailable(
+                        'Accounts devolvió un documento JWKS inválido.'
+                    );
+                }
+
+                return collect($keys)
+                    ->filter(
+                        fn (mixed $key): bool => is_array($key)
+                            && isset($key['kid'])
+                            && is_string($key['kid'])
+                    )
+                    ->keyBy('kid')
+                    ->all();
+            },
+        );
     }
 
+    /**
+     * Determine whether the JWKS may be refreshed.
+     */
     public function mayRefreshKeys(): bool
     {
-        return Cache::add('accounts-client:jwks-refresh:'.md5((string) config('accounts.issuer')), 1, 60);
+        return Cache::add(
+            $this->cacheKey('jwks-refresh'),
+            true,
+            self::JWKS_REFRESH_COOLDOWN,
+        );
     }
 
     /**
@@ -59,16 +112,32 @@ class Discovery
      */
     private function fetch(string $url): array
     {
-        try {
-            $response = $this->http->client()->get($url);
-        } catch (ConnectionException $exception) {
-            throw new AccountsUnavailable('Accounts no respondió.', previous: $exception);
-        }
+        $response = $this->http->get($url);
 
         if (! $response->successful()) {
-            throw new AccountsUnavailable("Accounts respondió {$response->status()}.");
+            throw new AccountsUnavailable(
+                "Accounts respondió {$response->status()}."
+            );
         }
 
-        return (array) $response->json();
+        $document = $response->json();
+
+        if (! is_array($document)) {
+            throw new AccountsUnavailable(
+                'Accounts devolvió una respuesta JSON inválida.'
+            );
+        }
+
+        return $document;
+    }
+
+    private function issuer(): string
+    {
+        return (string) config('accounts.issuer');
+    }
+
+    private function cacheKey(string $type): string
+    {
+        return "accounts-client:{$type}:".hash('sha256', $this->issuer());
     }
 }

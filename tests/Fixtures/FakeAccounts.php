@@ -42,6 +42,14 @@ class FakeAccounts
 
     public bool $userInfoFails = false;
 
+    public array $metadataOverrides = [];
+
+    public array $profileOverrides = [];
+
+    public ?Closure $introspectionResponse = null;
+
+    public ?Closure $refreshResponse = null;
+
     /** @var list<string>|null roles UserInfo reports; null means the claim is absent */
     public ?array $roles = null;
 
@@ -87,6 +95,7 @@ class FakeAccounts
                     'userinfo_endpoint' => $issuer.'/oauth/userinfo',
                     'jwks_uri' => $issuer.'/oauth/jwks',
                     'end_session_endpoint' => $issuer.'/oauth/end-session',
+                    ...$this->metadataOverrides,
                 ]),
                 $path === '/oauth/jwks' => Http::response(['keys' => [$this->jwk()]]),
                 $path === '/oauth/token' => $this->token($request),
@@ -94,7 +103,9 @@ class FakeAccounts
                 $path === '/oauth/userinfo' => Http::response([
                     'sub' => $this->subject, 'name' => $this->name, 'email' => 'ana@example.test', 'email_verified' => true,
                     ...($this->roles === null ? [] : ['roles' => $this->roles]),
+                    ...$this->profileOverrides,
                 ]),
+                $path === '/oauth/introspect' && $this->introspectionResponse !== null => ($this->introspectionResponse)(),
                 $path === '/oauth/introspect' && $this->introspectionStatus !== null => Http::response(['error' => 'invalid_client'], $this->introspectionStatus),
                 $path === '/oauth/introspect' => Http::response($this->introspectionActive
                     ? ['active' => true, 'sub' => $this->subject, 'accounts_session_expires_at' => now()->addSeconds($this->sessionExpiresIn)->getTimestamp(), 'accounts_profile_version' => $this->profileVersion]
@@ -185,6 +196,10 @@ class FakeAccounts
         $data = $request->data();
 
         if ($data['grant_type'] === 'refresh_token') {
+            if ($this->refreshResponse !== null) {
+                return ($this->refreshResponse)($data);
+            }
+
             if ($this->refreshTimesOut) {
                 throw new ConnectionException('timeout');
             }

@@ -4,7 +4,6 @@ namespace LuisML\AccountsClient\Actions;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use LuisML\AccountsClient\Identity;
 
@@ -23,6 +22,8 @@ class ResolveModelUser
             ->where('accounts_sub', $identity->subject)
             ->first() ?? new $model;
 
+        $schema = $user->getConnection()->getSchemaBuilder();
+
         // forceFill: the application's own mass-assignment rules must not drop the link columns.
         $user->forceFill(array_filter([
             'name' => $identity->name ?? $user->name ?? 'Cuenta LuisML',
@@ -30,14 +31,17 @@ class ResolveModelUser
         ], fn ($value) => $value !== null));
 
         // Roles are assigned in Accounts; a missing list means none, so a revoked role never lingers.
-        if (Schema::hasColumn($user->getTable(), 'accounts_roles')) {
+        if ($schema->hasColumn($user->getTable(), 'accounts_roles')) {
             // Stored as JSON by hand when the model does not cast the column (no HasAccountsRoles trait).
             $user->forceFill(['accounts_roles' => $user->hasCast('accounts_roles') ? $identity->roles : json_encode($identity->roles)]);
         }
 
         // Accounts is the authority on email verification: a verified email there is verified here.
-        if ($identity->emailVerified && $identity->email !== null && Schema::hasColumn($user->getTable(), 'email_verified_at') && $user->email_verified_at === null) {
-            $user->forceFill(['email_verified_at' => now()]);
+        if ($schema->hasColumn($user->getTable(), 'email_verified_at')) {
+            $verifiedAt = $identity->emailVerified && $identity->email !== null
+                ? ($user->isDirty('email') ? now() : ($user->email_verified_at ?? now()))
+                : null;
+            $user->forceFill(['email_verified_at' => $verifiedAt]);
         }
 
         if (! $user->exists) {

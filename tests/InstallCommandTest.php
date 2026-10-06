@@ -71,6 +71,24 @@ test('--remove-auth keeps a file that other code still uses', function () {
     expect(File::exists($this->dir.'/app/Http/Controllers/Settings/SecurityController.php'))->toBeTrue();
 });
 
+test('--remove-auth preserves dependencies of retained conflicts transitively', function () {
+    writeProjectFile($this->dir, 'routes/settings.php', "Route::get('settings/security', [SecurityController::class, 'edit']);");
+    writeProjectFile($this->dir, 'app/Http/Controllers/Settings/SecurityController.php', "return Inertia::render('settings/security');");
+    writeProjectFile($this->dir, 'resources/js/pages/settings/security.tsx', "import ManageTwoFactor from '@/components/manage-two-factor';");
+    writeProjectFile($this->dir, 'resources/js/components/manage-two-factor.tsx', "import useTwoFactor from '@/hooks/use-two-factor-auth';");
+    writeProjectFile($this->dir, 'resources/js/hooks/use-two-factor-auth.ts');
+    writeProjectFile($this->dir, 'resources/js/pages/auth/register.tsx');
+
+    $this->artisan('accounts:install', ['--remove-auth' => true, '--force' => true])->assertSuccessful();
+
+    foreach (['app/Http/Controllers/Settings/SecurityController.php', 'resources/js/pages/settings/security.tsx',
+        'resources/js/components/manage-two-factor.tsx', 'resources/js/hooks/use-two-factor-auth.ts'] as $file) {
+        expect(File::exists($this->dir.'/'.$file))->toBeTrue();
+    }
+
+    expect(File::exists($this->dir.'/resources/js/pages/auth/register.tsx'))->toBeFalse();
+});
+
 test('it reports route groups without accounts.access and --protect-routes fixes them once', function () {
     writeProjectFile($this->dir, 'routes/web.php', "Route::middleware(['auth', 'verified'])->group(fn () => 1);\nRoute::middleware(['auth', 'accounts.access'])->group(fn () => 2);\nRoute::get('/')->middleware(['throttle:6,1']);");
 

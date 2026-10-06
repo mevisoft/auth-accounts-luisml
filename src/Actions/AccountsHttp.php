@@ -14,9 +14,25 @@ class AccountsHttp
     {
         return Http::connectTimeout((int) config('accounts.http.connect_timeout'))
             ->timeout((int) config('accounts.http.timeout'))
+            ->withoutRedirecting()
             ->acceptJson()
             ->asForm()
             ->baseUrl(rtrim((string) config('accounts.issuer'), '/'));
+    }
+
+    public function get(string $url, ?string $bearer = null): Response
+    {
+        $request = $this->client();
+
+        if ($bearer !== null) {
+            $request->withToken($bearer);
+        }
+
+        try {
+            return $request->get($url);
+        } catch (ConnectionException $exception) {
+            throw new AccountsUnavailable('Accounts no respondió.', previous: $exception);
+        }
     }
 
     /**
