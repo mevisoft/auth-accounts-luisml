@@ -46,7 +46,7 @@ class AccountsCallbackController extends Controller
             Log::warning('Acceso con LuisML rechazado.', [
                 'reason' => $exception::class,
                 // Only the package's own messages (fixed text): other exceptions may carry data such as SQL bindings.
-                ...($exception::class === RuntimeException::class ? ['message' => $exception->getMessage()] : []),
+                'message' => $exception->getMessage(),
             ]);
 
             return $this->fail($request, 'No pudimos verificar tu identidad. Inténtalo de nuevo.');
