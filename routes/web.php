@@ -20,5 +20,5 @@ Route::prefix(config('accounts.routes.prefix', 'auth/accounts'))->group(function
 
 // The `login` address guests are sent to: straight on to Accounts, with a guard against loops.
 if (config('accounts.routes.login', true)) {
-    Route::middleware('web')->get('login', AccountsEntryController::class)->name('login');
+    Route::middleware('web')->get(config('accounts.routes.login_path', 'login'), AccountsEntryController::class)->name(config('accounts.routes.login_name', 'login'));
 }

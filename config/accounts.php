@@ -103,6 +103,8 @@ return [
 
         // Registers GET /login (route name `login`), which sends guests straight to Accounts.
         'login' => true,
+        'login_name' => 'login',
+        'login_path' => 'login'
     ],
 
 ];
