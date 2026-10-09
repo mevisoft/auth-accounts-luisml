@@ -48,6 +48,8 @@ class ResolveModelUser
             $user->forceFill([
                 'accounts_issuer' => $identity->issuer,
                 'accounts_sub' => $identity->subject,
+            ]);
+            $user->fill([
                 'password' => Hash::make(Str::random(64)),
             ]);
         }
