@@ -43,6 +43,7 @@ class AccountsCallbackController extends Controller
                 'safeToRetry' => true,
             ], 503, ['Retry-After' => '10']);
         } catch (Throwable $exception) {
+            report($exception);
             Log::warning('Acceso con LuisML rechazado.', [
                 'reason' => $exception::class,
                 // Only the package's own messages (fixed text): other exceptions may carry data such as SQL bindings.
