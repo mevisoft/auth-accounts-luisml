@@ -36,7 +36,7 @@ class CompleteLogin
         ]);
 
         if (! $tokens->successful() || ! is_string($tokens->json('access_token')) || ! is_string($tokens->json('id_token'))) {
-            throw new RuntimeException('Accounts rechazó el canje del código.');
+            throw new RuntimeException('Accounts rechazó el canje del código: '.$tokens->body());
         }
 
         $payload = TokenResponse::tokens($tokens->json());
@@ -48,7 +48,7 @@ class CompleteLogin
         $info = $this->http->get($metadata['userinfo_endpoint'], $payload['access_token']);
 
         if (! $info->successful() || $info->json('sub') !== $claims['sub']) {
-            throw new RuntimeException('UserInfo no corresponde al ID Token.');
+            throw new RuntimeException('UserInfo no corresponde al ID Token: '.$info->body());
         }
 
         $payload['expires_in'] -= now()->getTimestamp() - $startedAt;
