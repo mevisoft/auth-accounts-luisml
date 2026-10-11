@@ -26,8 +26,9 @@ test('only the authentication parameters the client understands reach Accounts',
         'scope' => 'admin',
     ]);
 
-    expect($authorize)->toMatchArray(['acr_values' => 'urn:accounts:acr:phr', 'max_age' => '300', 'prompt' => 'login', 'scope' => 'openid profile email roles'])
-        ->not->toHaveKey('login_hint');
+    // `login_hint` now reaches Accounts too (a valid email or account identifier), so that an application can
+    // ask for a specific account or for the account chooser; everything else the client does not own is dropped.
+    expect($authorize)->toMatchArray(['acr_values' => 'urn:accounts:acr:phr', 'max_age' => '300', 'prompt' => 'login', 'login_hint' => 'ana@example.test', 'scope' => 'openid profile email roles']);
 
     $invalid = loginWith(['acr_values' => 'bad value; drop', 'max_age' => '-1', 'prompt' => 'none']);
 

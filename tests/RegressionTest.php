@@ -140,7 +140,7 @@ test('queue failures cannot prevent local logout', function () {
     $this->accounts->revokeFails = true;
     Bus::shouldReceive('dispatch')->once()->andThrow(new RuntimeException('Queue unavailable'));
 
-    $this->post('/auth/accounts/logout')->assertRedirect('/');
+    $this->post('/auth/accounts/logout')->assertRedirect();
     $this->assertGuest();
     expect(session('accounts.session'))->toBeNull();
 });
@@ -148,7 +148,7 @@ test('queue failures cannot prevent local logout', function () {
 test('a synchronous revocation retry failing cannot prevent local logout', function () {
     $this->login();
     $this->accounts->revokeFails = true;
-    $this->post('/auth/accounts/logout')->assertRedirect('/');
+    $this->post('/auth/accounts/logout')->assertRedirect();
     $this->assertGuest();
 });
 

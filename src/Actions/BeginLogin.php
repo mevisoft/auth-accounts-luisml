@@ -60,7 +60,8 @@ class BeginLogin
     }
 
     /**
-     * Only the authentication parameters this client understands ever reach Accounts.
+     * Only the authentication parameters this client understands ever reach Accounts. A `login_hint`
+     * is the email or the public identifier of the account to prefer; anything else is dropped.
      *
      * @param  array<string, mixed>  $options
      * @return array<string, int|string>
@@ -77,11 +78,20 @@ class BeginLogin
             $allowed['acr_values'] = $options['acr_values'];
         }
 
-        if (isset($options['prompt']) && in_array($options['prompt'], ['login', 'consent'], true)) {
+        if (isset($options['prompt']) && in_array($options['prompt'], ['login', 'consent', 'select_account'], true)) {
             $allowed['prompt'] = $options['prompt'];
         }
 
+        if (isset($options['login_hint']) && is_string($options['login_hint']) && $this->isAccountHint($options['login_hint'])) {
+            $allowed['login_hint'] = $options['login_hint'];
+        }
+
         return $allowed;
+    }
+
+    private function isAccountHint(string $hint): bool
+    {
+        return strlen($hint) <= 255 && (filter_var($hint, FILTER_VALIDATE_EMAIL) !== false || Str::isUuid($hint));
     }
 
     /**

@@ -54,8 +54,9 @@ test('the endpoint needs no cookies or CSRF token', function () {
 });
 
 test('signing out sends the browser to end the central session only when global logout is on', function () {
+    config(['accounts.global_logout' => false]);
     signedInWithSession('sid-1');
-    $this->post('/auth/accounts/logout')->assertRedirect('/');
+    $this->post('/auth/accounts/logout')->assertRedirect(route('accounts.signed-out'));
 
     config(['accounts.global_logout' => true, 'accounts.post_logout_redirect' => 'https://app.example.test/bye']);
     signedInWithSession('sid-1');

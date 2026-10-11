@@ -33,7 +33,7 @@ Requisitos: PHP ^8.2 y Laravel ^11, ^12 o ^13.
    ACCOUNTS_HOME=/dashboard
    ```
 
-   `ACCOUNTS_HOME` es el destino tras entrar cuando no hay otro, y donde aterriza el cierre de sesión.
+   `ACCOUNTS_HOME` es el destino tras entrar cuando no hay otro, y el destino cuando no hay página de cierre de sesión configurada.
 
 4. Protege las rutas:
 
@@ -47,16 +47,18 @@ Requisitos: PHP ^8.2 y Laravel ^11, ^12 o ^13.
    Con Wayfinder: `import { login } from '@/routes/accounts'` y `login.url()`.
    No uses `accounts.callback` como enlace: es el retorno de OAuth y exige `code` y `state`.
 
-6. Cierre de sesión: haz `POST` a `route('accounts.logout')`. Destruye la sesión local y revoca el acceso en Accounts
-   (si no puede confirmarlo, un job lo reintenta). No afecta a otras apps ni a otros navegadores.
+6. Cierre de sesión: haz `POST` a `route('accounts.logout')`. Siempre termina la sesión local y revoca el acceso en Accounts
+   (si no puede confirmarlo, un job lo reintenta). Por defecto (`global_logout`) también cierra la sesión central y aterriza en
+   la página `accounts.signed-out`, que informa del resultado.
 
 ## Rutas que registra el paquete
 
 | Nombre | Ruta | Uso |
 |---|---|---|
-| `accounts.login` | `GET /auth/accounts/redirect` | Inicia el login (PKCE, `state`, `nonce`). |
+| `accounts.login` | `GET /auth/accounts/redirect` | Inicia el login (PKCE, `state`, `nonce`). Acepta `login_hint` (correo o UUID) y `prompt=select_account`. |
 | `accounts.callback` | `GET /auth/accounts/callback` | Retorno de Accounts. No enlazar. |
 | `accounts.logout` | `POST /auth/accounts/logout` | Cierre de sesión con revocación. |
+| `accounts.signed-out` | `GET /auth/accounts/signed-out` | Página de cierre de sesión: estados `done`, `local` y `central_pending`. |
 | `accounts.backchannel-logout` | `POST /auth/accounts/backchannel-logout` | Aviso de Accounts de que una sesión terminó. Sin cookies ni CSRF. No enlazar. |
 
 El prefijo se cambia con `accounts.routes.prefix`.
@@ -86,8 +88,10 @@ ni se eliminen de la caché durante ese plazo; `array` sirve solo para pruebas.
 
 ## Cierre de sesión central
 
-- **Local (por defecto):** `POST accounts.logout` cierra la sesión de esta app y revoca su acceso.
-- **Global:** con `ACCOUNTS_GLOBAL_LOGOUT=true` el cierre también termina la sesión central en Accounts (RP-initiated logout, con `id_token_hint`) y vuelve a `ACCOUNTS_POST_LOGOUT_REDIRECT_URI`, que debe estar registrada para esta app en Accounts. Solo se aplica a sesiones iniciadas con esta versión (necesitan el ID Token guardado).
+- **Local siempre:** `POST accounts.logout` termina la sesión de esta app y revoca su acceso, pase lo que pase con Accounts.
+- **Global (por defecto):** `ACCOUNTS_GLOBAL_LOGOUT=true` también termina la sesión central (RP-initiated logout, con `id_token_hint`) y vuelve a la página `accounts.signed-out`, o a `ACCOUNTS_POST_LOGOUT_REDIRECT_URI` si se define. Esa URL debe estar registrada en `post_logout_redirect_uris` de la app en Accounts. Con `false` solo se cierra la local.
+- **Resultado honesto:** la página muestra `done` (cerrada también en Accounts), `local` (solo local, por configuración) o `central_pending` (no se pudo confirmar el cierre central). En este último caso ofrece «Completar cierre», que reintenta con `login_hint` sin necesitar el ID Token.
+- Un login posterior cancela el job de revocación pendiente de un cierre anterior. Los eventos se registran en el canal `ACCOUNTS_LOG_CHANNEL` (`log_channel`).
 - **Back-channel:** registra en Accounts la dirección `https://tu-app/auth/accounts/backchannel-logout`. Cuando la sesión central termina (cierre en otra app, cierre de todas las sesiones, cambio de contraseña, suspensión), Accounts avisa y la sesión local se cierra en su siguiente petición. Requiere una caché compartida por todos los servidores de la app (no `array`).
 
 Los reintentos de revocación necesitan una cola persistente y un worker. Con `sync` no hay reintentos
@@ -215,8 +219,9 @@ public function actingAs(Authenticatable $user, $guard = null): static
 | `scopes` | `openid profile email roles` | `roles` entrega los roles que Accounts asigna en esta app (hay que permitirlo para la app en el panel de Accounts). |
 | `http.connect_timeout` / `http.timeout` | 10 s / 10 s | `ACCOUNTS_CONNECT_TIMEOUT`, `ACCOUNTS_TIMEOUT`. |
 | `account_url` | `{issuer}/account` | `ACCOUNTS_ACCOUNT_URL`. |
-| `global_logout` | `false` | `ACCOUNTS_GLOBAL_LOGOUT`. Ver «Cierre de sesión central». |
-| `post_logout_redirect` | — | `ACCOUNTS_POST_LOGOUT_REDIRECT_URI`. |
+| `global_logout` | `true` | `ACCOUNTS_GLOBAL_LOGOUT`. Ver «Cierre de sesión central». |
+| `post_logout_redirect` | página `accounts.signed-out` | `ACCOUNTS_POST_LOGOUT_REDIRECT_URI`; debe estar registrada en Accounts. |
+| `log_channel` | canal por defecto | `ACCOUNTS_LOG_CHANNEL`. Canal de logs de seguridad. |
 | `validation_seconds` | 60 | Plazo máximo de una validación. No ampliar sin medirlo. |
 | `activity_interval_seconds` | 15 | |
 | `clock_skew_seconds` | 30 | Tolerancia de reloj en los JWT; no extiende el plazo de 60 s. |

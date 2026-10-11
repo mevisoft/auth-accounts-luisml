@@ -46,15 +46,24 @@ return [
     | Logout
     |--------------------------------------------------------------------------
     |
-    | With `global_logout`, signing out of this app also ends the person's central session in
-    | Accounts (RP-initiated logout) and returns to `post_logout_redirect`, an address registered
-    | for this app in Accounts. Off by default: signing out stays local to this app.
+    | With `global_logout` (on by default), signing out of this app also ends the person's central
+    | session in Accounts (RP-initiated logout) and returns to `post_logout_redirect`: an address
+    | registered for this app in Accounts. Empty means this app's signed-out page
+    | (`accounts.signed-out`), which is also where every sign-out ends; it must be registered too.
+    | An app that wants sign-out to stay local sets `ACCOUNTS_GLOBAL_LOGOUT=false`.
     |
     */
 
-    'global_logout' => (bool) env('ACCOUNTS_GLOBAL_LOGOUT', false),
+    'global_logout' => (bool) env('ACCOUNTS_GLOBAL_LOGOUT', true),
 
     'post_logout_redirect' => env('ACCOUNTS_POST_LOGOUT_REDIRECT_URI'),
+
+    /*
+    | Log channel for what only this app knows about a sign-in or sign-out (a close that could not be
+    | confirmed, an account switch). Null uses the application's default channel.
+    */
+
+    'log_channel' => env('ACCOUNTS_LOG_CHANNEL'),
 
     /*
     |--------------------------------------------------------------------------
@@ -104,7 +113,7 @@ return [
         // Registers GET /login (route name `login`), which sends guests straight to Accounts.
         'login' => true,
         'login_name' => 'login',
-        'login_path' => 'login'
+        'login_path' => 'login',
     ],
 
 ];

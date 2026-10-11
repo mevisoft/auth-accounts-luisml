@@ -22,7 +22,7 @@ class AccountsLoginController extends Controller
                 $request,
                 is_string($path) && str_starts_with($path, '/') && ! str_starts_with($path, '//')
                     && ! str_contains($path, '\\') && ! preg_match('/[\x00-\x1f\x7f]/', $path) ? $path : null,
-                $request->only(['acr_values', 'max_age', 'prompt']),
+                $request->only(['acr_values', 'max_age', 'prompt', 'login_hint']),
             );
         } catch (AccountsUnavailable) {
             return response()->view('accounts::unavailable', [

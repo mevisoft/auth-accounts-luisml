@@ -5,8 +5,10 @@ namespace LuisML\AccountsClient\Actions;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use LuisML\AccountsClient\AccountsSession;
 use LuisML\AccountsClient\Identity;
+use LuisML\AccountsClient\Jobs\RevokeAccountsAccess;
 use RuntimeException;
 
 class CompleteLogin
@@ -70,6 +72,13 @@ class CompleteLogin
 
         Auth::login($user);
         $request->session()->regenerate();
+
+        // A revocation still waiting to be retried must not close the session just opened (see RevokeAccountsAccess).
+        Cache::put(
+            RevokeAccountsAccess::loginMarkerKey($identity->subject),
+            now()->getTimestamp(),
+            now()->addMinutes(RevokeAccountsAccess::LOGIN_MARKER_MINUTES),
+        );
 
         return $user;
     }

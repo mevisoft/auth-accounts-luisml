@@ -210,7 +210,9 @@ test('a report near the end of the central session goes out without waiting for 
 });
 
 test('logging out revokes this browser access and destroys the local session', function () {
-    $this->post(route('accounts.logout'))->assertRedirect('/')->assertSessionHas('status', 'Cerraste sesión.');
+    config(['accounts.global_logout' => false]);
+
+    $this->post(route('accounts.logout'))->assertRedirect(route('accounts.signed-out'));
 
     $this->assertGuest();
     expect($this->accounts->called('POST /oauth/revoke'))->toBe(1);
@@ -221,7 +223,9 @@ test('if the revocation cannot be confirmed, a durable job retries it and the pe
     Queue::fake();
     $this->accounts->revokeFails = true;
 
-    $this->post(route('accounts.logout'))->assertRedirect('/')->assertSessionHas('status', fn ($status) => str_contains($status, 'lo reintentaremos'));
+    config(['accounts.global_logout' => false]);
+
+    $this->post(route('accounts.logout'))->assertRedirect(route('accounts.signed-out'))->assertSessionHas('status', fn ($status) => str_contains($status, 'lo reintentaremos'));
 
     $this->assertGuest();
     Queue::assertPushed(RevokeAccountsAccess::class, fn ($job) => ! str_contains($job->encryptedToken, 'refresh-initial'));
@@ -231,7 +235,9 @@ test('logging out while Accounts is down still ends the session and queues the r
     Queue::fake();
     $this->accounts->down = true;
 
-    $this->post(route('accounts.logout'))->assertRedirect('/');
+    // Whether the browser is sent on to Accounts (discovery was cached) or to the signed-out page, the local
+    // session is already gone and the revocation is queued.
+    $this->post(route('accounts.logout'))->assertRedirect();
 
     $this->assertGuest();
     Queue::assertPushed(RevokeAccountsAccess::class);
